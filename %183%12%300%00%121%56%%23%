@@ -1,6 +1,3 @@
--- ==============================================================================
--- 🚀 HAOXIAO UI 核心渲染引擎 (Library.lua) - 防检测优化版
--- ==============================================================================
 local Library = { ActiveNotifications = {} } 
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -11,11 +8,9 @@ local Players = game:GetService("Players")
 local function GetGuiParent()
     if gethui then return gethui() end
     if syn and syn.protect_gui then
-        local gui = Instance.new("ScreenGui") 
-        syn.protect_gui(gui)
+        local gui = Instance.new("ScreenGui") syn.protect_gui(gui)
         local success, core = pcall(function() return game:GetService("CoreGui") end)
-        if success and core then gui.Parent = core end 
-        return gui
+        if success and core then gui.Parent = core end return gui
     end
     local success, core = pcall(function() return game:GetService("CoreGui") end)
     if success and core then return core end
@@ -26,7 +21,7 @@ end
 -- 高强度随机字符串生成器 (大小写字母+数字)
 local function GenerateRandomString(length)
     local res = ""
-    local chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    local chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789😇🥲😖🤩😄😭😈😂☠️😨👍🏻😘"
     for i = 1, length do
         local rand = math.random(1, #chars)
         res = res .. string.sub(chars, rand, rand)
@@ -34,7 +29,6 @@ local function GenerateRandomString(length)
     return res
 end
 
--- 初始化全局通知屏幕
 local NotifyScreen = Instance.new("ScreenGui")
 NotifyScreen.Name = GenerateRandomString(32)
 NotifyScreen.ResetOnSpawn = false
@@ -93,11 +87,10 @@ function Library:CreateWindow(Settings)
     Instance.new("UICorner", FloatingBtn).CornerRadius = UDim.new(0, Config.FloatingButton.CornerRadius)
     Instance.new("UIStroke", FloatingBtn).Color = StrokeColor
 
-    -- 悬浮窗拖拽逻辑优化
     local fDragging, fDragInput, fDragStart, fStartPos
     FloatingBtn.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            fDragging = true; fDragStart = input.Position; fStartPos = FloatingBtn.Position
+            fDragging = true fDragStart = input.Position fStartPos = FloatingBtn.Position
             input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then fDragging = false end end)
         end
     end)
@@ -111,7 +104,6 @@ function Library:CreateWindow(Settings)
         end
     end)
 
-    -- 主面板
     local MainFrame = Instance.new("Frame", ScreenGui)
     MainFrame.Name = GenerateRandomString(16)
     MainFrame.Size = UDim2.fromOffset(Config.Window.Width, Config.Window.Height)
@@ -155,7 +147,6 @@ function Library:CreateWindow(Settings)
         Btn.MouseButton1Click:Connect(callback)
     end
 
-    -- 最小化按钮
     CreateTopButton("-", function()
         FloatingBtn.Visible = true FloatingBtn.BackgroundTransparency = 1 
         TweenService:Create(FloatingBtn, TweenInfo.new(0.3), {BackgroundTransparency = Config.FloatingButton.BackgroundTransparency}):Play()
@@ -172,7 +163,6 @@ function Library:CreateWindow(Settings)
         tw:Play() tw.Completed:Connect(function() FloatingBtn.Visible = false end)
     end)
 
-    -- 最大化按钮
     local originalSize = MainFrame.Size
     local originalPos = MainFrame.Position
     CreateTopButton("□", function()
@@ -187,7 +177,6 @@ function Library:CreateWindow(Settings)
         end
     end)
 
-    -- 退出对话框
     local DialogFrame = Instance.new("CanvasGroup", MainFrame)
     DialogFrame.Size = UDim2.fromOffset(200, 90) DialogFrame.Position = UDim2.fromScale(0.5, 0.45) DialogFrame.AnchorPoint = Vector2.new(0.5, 0.5) DialogFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25) DialogFrame.BorderSizePixel = 0 DialogFrame.ZIndex = 50 DialogFrame.Visible = false DialogFrame.GroupTransparency = 1
     Instance.new("UICorner", DialogFrame).CornerRadius = UDim.new(0, 10) Instance.new("UIStroke", DialogFrame).Color = StrokeColor
@@ -218,26 +207,159 @@ function Library:CreateWindow(Settings)
         TweenService:Create(DialogFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = UDim2.fromOffset(220, 110), GroupTransparency = 0 }):Play()
     end)
 
-    -- 主窗口拖拽逻辑
-    local dragging, dragInput, dragStart, startPos
-    TopBar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true; dragStart = input.Position; startPos = MainFrame.Position
-            input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
-        end
-    end)
-    TopBar.InputChanged:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end end)
+    local resDragging, resType, resStartSize, resDragStart, resDragInput = false, "", nil, nil, nil
+    local function CreateResizeHandle(name, size, pos, anchor, rType)
+        local handle = Instance.new("TextButton", MainFrame) handle.Name = name handle.Size = size handle.Position = pos handle.AnchorPoint = anchor handle.BackgroundTransparency = 1 handle.Text = "" handle.ZIndex = 100
+        handle.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                resDragging = true resType = rType resStartSize = MainFrame.AbsoluteSize resDragStart = input.Position
+                input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then resDragging = false end end)
+            end
+        end)
+        handle.InputChanged:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then resDragInput = input end end)
+    end
+    CreateResizeHandle("ResizeBottom", UDim2.new(1, -16, 0, 10), UDim2.new(0, 0, 1, 0), Vector2.new(0, 1), "Y")
+    CreateResizeHandle("ResizeRight", UDim2.new(0, 10, 1, -16), UDim2.new(1, 0, 0, 0), Vector2.new(1, 0), "X")
+    CreateResizeHandle("ResizeCorner", UDim2.new(0, 16, 0, 16), UDim2.new(1, 0, 1, 0), Vector2.new(1, 1), "Both")
     UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
-            local delta = input.Position - dragStart
-            MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        if resDragging and input == resDragInput and not Window.IsMaximized then
+            local delta = input.Position - resDragStart
+            local newW = (resType == "Both" or resType == "X") and math.clamp(resStartSize.X + delta.X, Config.Window.MinSize.X, 1500) or resStartSize.X
+            local newH = (resType == "Both" or resType == "Y") and math.clamp(resStartSize.Y + delta.Y, Config.Window.MinSize.Y, 1200) or resStartSize.Y
+            MainFrame.Size = UDim2.fromOffset(newW, newH) Config.Window.Width, Config.Window.Height = newW, newH
         end
     end)
 
-    -- 省略了调整大小和颜色选择器的冗长排版，保持你的原有逻辑（未做破坏性修改，仅优化层级）
-    -- (ColorDialog & Resize Logic 保留原样工作良好)
-    -- ... [你的调整大小和颜色板逻辑依然正常运行，此处精简显示，你原本的代码即可无缝工作] ...
+    local ColorDialog = Instance.new("CanvasGroup", MainFrame)
+    ColorDialog.Size = UDim2.fromOffset(Config.ColorPicker.DialogWidth, Config.ColorPicker.DialogHeight) 
+    ColorDialog.Position = UDim2.fromScale(0.5, 0.5) 
+    ColorDialog.AnchorPoint = Vector2.new(0.5, 0.5) 
+    ColorDialog.BackgroundColor3 = Color3.fromRGB(25, 25, 25) 
+    ColorDialog.ZIndex = 60 ColorDialog.Visible = false ColorDialog.GroupTransparency = 1
+    Instance.new("UICorner", ColorDialog).CornerRadius = UDim.new(0, 12) 
+    Instance.new("UIStroke", ColorDialog).Color = StrokeColor 
+
+    local LeftPanel = Instance.new("Frame", ColorDialog)
+    LeftPanel.Size = UDim2.new(0, 140, 1, 0) LeftPanel.BackgroundTransparency = 1
     
+    local CTitle = Instance.new("TextLabel", LeftPanel)
+    CTitle.Size = UDim2.new(1, 0, 0, 35) CTitle.Text = "选择颜色" CTitle.Font = Enum.Font.GothamBold CTitle.TextColor3 = FontColor CTitle.TextSize = 14 CTitle.BackgroundTransparency = 1 CTitle.ZIndex = 61
+    
+    local RGBContainer = Instance.new("Frame", LeftPanel)
+    RGBContainer.Size = UDim2.new(1, -20, 0, 110) RGBContainer.Position = UDim2.new(0, 10, 0, 45) RGBContainer.BackgroundTransparency = 1
+    local RGBLayout = Instance.new("UIListLayout", RGBContainer)
+    RGBLayout.Padding = UDim.new(0, 8) RGBLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+    local function CreateColorInput(labelTxt)
+        local bg = Instance.new("Frame", RGBContainer) bg.Size = UDim2.new(1, 0, 0, 30) bg.BackgroundColor3 = Color3.fromRGB(35, 35, 35) Instance.new("UICorner", bg).CornerRadius = UDim.new(0, 6)
+        local lbl = Instance.new("TextLabel", bg) lbl.Size = UDim2.new(0, 30, 1, 0) lbl.BackgroundTransparency = 1 lbl.Text = labelTxt lbl.TextColor3 = FontColor lbl.Font = Enum.Font.GothamBold lbl.TextSize = 13
+        local box = Instance.new("TextBox", bg) box.Size = UDim2.new(1, -35, 1, 0) box.Position = UDim2.new(0, 30, 0, 0) box.BackgroundTransparency = 1 box.TextColor3 = FontColor box.Text = "255" box.Font = Config.Typography.FontType box.TextSize = 13 box.TextXAlignment = Enum.TextXAlignment.Left box.ClearTextOnFocus = false
+        return box
+    end
+    local RInput = CreateColorInput("R :")
+    local GInput = CreateColorInput("G :")
+    local BInput = CreateColorInput("B :")
+
+    local ColorPreview = Instance.new("Frame", LeftPanel)
+    ColorPreview.Size = UDim2.new(1, -20, 0, 26) 
+    ColorPreview.Position = UDim2.new(0, 10, 0, 162) 
+    ColorPreview.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    ColorPreview.ZIndex = 61
+    Instance.new("UICorner", ColorPreview).CornerRadius = UDim.new(0, 6)
+    Instance.new("UIStroke", ColorPreview).Color = StrokeColor
+    
+    local CBtnContainer = Instance.new("Frame", LeftPanel)
+    CBtnContainer.Size = UDim2.new(1, -20, 0, 30) CBtnContainer.Position = UDim2.new(0, 10, 1, -40) CBtnContainer.BackgroundTransparency = 1
+    local C_CancelBtn = Instance.new("TextButton", CBtnContainer) C_CancelBtn.Size = UDim2.new(0.45, 0, 1, 0) C_CancelBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45) C_CancelBtn.Text = "取消" C_CancelBtn.TextColor3 = FontColor C_CancelBtn.TextSize = 12 C_CancelBtn.Font = Config.Typography.FontType Instance.new("UICorner", C_CancelBtn).CornerRadius = UDim.new(0, 6)
+    local C_ConfirmBtn = Instance.new("TextButton", CBtnContainer) C_ConfirmBtn.Size = UDim2.new(0.45, 0, 1, 0) C_ConfirmBtn.Position = UDim2.new(0.55, 0, 0, 0) C_ConfirmBtn.BackgroundColor3 = Color3.fromRGB(80, 160, 100) C_ConfirmBtn.Text = "确定" C_ConfirmBtn.TextColor3 = Color3.fromRGB(255, 255, 255) C_ConfirmBtn.TextSize = 12 C_ConfirmBtn.Font = Config.Typography.FontType Instance.new("UICorner", C_ConfirmBtn).CornerRadius = UDim.new(0, 6)
+
+    local RightPanel = Instance.new("Frame", ColorDialog)
+    RightPanel.Size = UDim2.new(1, -140, 1, 0) RightPanel.Position = UDim2.fromOffset(140, 0) RightPanel.BackgroundTransparency = 1
+
+    local ColDivider = Instance.new("Frame", ColorDialog)
+    ColDivider.Size = UDim2.new(0, 1, 1, -20) ColDivider.Position = UDim2.fromOffset(140, 10) ColDivider.BackgroundColor3 = StrokeColor ColDivider.BorderSizePixel = 0
+
+    local SatValMap = Instance.new("TextButton", RightPanel)
+    SatValMap.Size = UDim2.new(0, 200, 0, 200) SatValMap.Position = UDim2.new(0, 10, 0, 20) SatValMap.BackgroundColor3 = Color3.fromRGB(255, 0, 0) SatValMap.Text = "" SatValMap.AutoButtonColor = false
+    Instance.new("UICorner", SatValMap).CornerRadius = UDim.new(0, 8)
+    local MapOverlay = Instance.new("ImageLabel", SatValMap)
+    MapOverlay.Size = UDim2.new(1, 0, 1, 0) MapOverlay.BackgroundTransparency = 1 MapOverlay.Image = "rbxassetid://4155801252"
+    Instance.new("UICorner", MapOverlay).CornerRadius = UDim.new(0, 8)
+    
+    local PickerDot = Instance.new("Frame", SatValMap)
+    PickerDot.Size = UDim2.fromOffset(12, 12) PickerDot.AnchorPoint = Vector2.new(0.5, 0.5) PickerDot.Position = UDim2.new(1, 0, 0, 0) PickerDot.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    Instance.new("UICorner", PickerDot).CornerRadius = UDim.new(1, 0)
+    Instance.new("UIStroke", PickerDot).Color = Color3.fromRGB(0, 0, 0)
+
+    local HueSlider = Instance.new("TextButton", RightPanel)
+    HueSlider.Size = UDim2.new(0, 20, 0, 200) HueSlider.Position = UDim2.new(0, 220, 0, 20) HueSlider.BackgroundColor3 = Color3.fromRGB(255, 255, 255) HueSlider.Text = "" HueSlider.AutoButtonColor = false
+    Instance.new("UICorner", HueSlider).CornerRadius = UDim.new(0, 6)
+    local HueGradient = Instance.new("UIGradient", HueSlider)
+    HueGradient.Rotation = 90
+    HueGradient.Color = ColorSequence.new{ ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)), ColorSequenceKeypoint.new(0.16, Color3.fromRGB(255, 255, 0)), ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0, 255, 0)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 255)), ColorSequenceKeypoint.new(0.66, Color3.fromRGB(0, 0, 255)), ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255, 0, 255)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0)) }
+    
+    local HueDot = Instance.new("Frame", HueSlider)
+    HueDot.Size = UDim2.new(1.4, 0, 0, 6) HueDot.Position = UDim2.new(0.5, 0, 0, 0) HueDot.AnchorPoint = Vector2.new(0.5, 0.5) HueDot.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    Instance.new("UICorner", HueDot).CornerRadius = UDim.new(1, 0)
+    Instance.new("UIStroke", HueDot).Color = Color3.fromRGB(0, 0, 0)
+
+    local activeColorCallback, activeColorSquare = nil, nil
+    local currentH, currentS, currentV = 1, 1, 1
+    
+    local function UpdateColorUI()
+        local hColor = Color3.fromHSV(currentH, 1, 1)
+        SatValMap.BackgroundColor3 = hColor
+        local fColor = Color3.fromHSV(currentH, currentS, currentV)
+        
+        RInput.Text = tostring(math.floor(fColor.R * 255))
+        GInput.Text = tostring(math.floor(fColor.G * 255))
+        BInput.Text = tostring(math.floor(fColor.B * 255))
+        
+        PickerDot.Position = UDim2.new(currentS, 0, 1 - currentV, 0)
+        HueDot.Position = UDim2.new(0.5, 0, currentH, 0)
+        
+        ColorPreview.BackgroundColor3 = fColor
+    end
+
+    local mapDragging, hueDragging = false, false
+    SatValMap.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then mapDragging = true end end)
+    HueSlider.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then hueDragging = true end end)
+    UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then mapDragging = false hueDragging = false end end)
+    
+    UserInputService.InputChanged:Connect(function(i)
+        if (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+            if mapDragging then
+                currentS = math.clamp((i.Position.X - SatValMap.AbsolutePosition.X) / SatValMap.AbsoluteSize.X, 0, 1)
+                currentV = 1 - math.clamp((i.Position.Y - SatValMap.AbsolutePosition.Y) / SatValMap.AbsoluteSize.Y, 0, 1)
+                UpdateColorUI()
+            elseif hueDragging then
+                currentH = math.clamp((i.Position.Y - HueSlider.AbsolutePosition.Y) / HueSlider.AbsoluteSize.Y, 0, 1)
+                UpdateColorUI()
+            end
+        end
+    end)
+
+    local function UpdateFromRGBBox()
+        local r = math.clamp(tonumber(RInput.Text) or 255, 0, 255)
+        local g = math.clamp(tonumber(GInput.Text) or 255, 0, 255)
+        local b = math.clamp(tonumber(BInput.Text) or 255, 0, 255)
+        currentH, currentS, currentV = Color3.toHSV(Color3.fromRGB(r, g, b))
+        UpdateColorUI()
+    end
+    RInput.FocusLost:Connect(UpdateFromRGBBox) GInput.FocusLost:Connect(UpdateFromRGBBox) BInput.FocusLost:Connect(UpdateFromRGBBox)
+
+    C_CancelBtn.MouseButton1Click:Connect(function() 
+        TweenService:Create(ColorDialog, TweenInfo.new(0.2), {GroupTransparency = 1}):Play()
+        task.delay(0.2, function() ColorDialog.Visible = false end)
+    end)
+    C_ConfirmBtn.MouseButton1Click:Connect(function()
+        local finalColor = Color3.fromHSV(currentH, currentS, currentV)
+        if activeColorSquare then activeColorSquare.BackgroundColor3 = finalColor end
+        if activeColorCallback then activeColorCallback(finalColor) end
+        TweenService:Create(ColorDialog, TweenInfo.new(0.2), {GroupTransparency = 1}):Play()
+        task.delay(0.2, function() ColorDialog.Visible = false end)
+    end)
+
     local BottomArea = Instance.new("Frame", MainFrame)
     BottomArea.Size = UDim2.new(1, 0, 1, -TopBarAbsoluteHeight) 
     BottomArea.Position = UDim2.new(0, 0, 0, TopBarAbsoluteHeight) 
@@ -256,9 +378,21 @@ function Library:CreateWindow(Settings)
     local ContentContainer = Instance.new("Frame", BottomArea)
     ContentContainer.Size = UDim2.new(5/6, -41, 1, 0) ContentContainer.Position = UDim2.new(1/6, 41, 0, 0) ContentContainer.BackgroundTransparency = 1
 
-    -- ==========================================
-    -- 🛠️ 核心 API (标准化命名)
-    -- ==========================================
+    local dragging, dragInput, dragStart, startPos
+    TopBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true dragStart = input.Position startPos = MainFrame.Position
+            input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
+        end
+    end)
+    TopBar.InputChanged:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+
     function Window:AddTab(TabConfig)
         local Tab = {} Tab.ItemCount = 0
         local TabBtn = Instance.new("TextButton", TabContainer)
@@ -269,7 +403,7 @@ function Library:CreateWindow(Settings)
         IconDisplay.Size = UDim2.new(0, 18, 0, 18) IconDisplay.Position = UDim2.new(0.08, 0, 0.5, 0) IconDisplay.AnchorPoint = Vector2.new(0, 0.5) IconDisplay.BackgroundTransparency = 1 IconDisplay.Image = TabConfig.Icon or "" IconDisplay.ScaleType = Enum.ScaleType.Fit
         
         local TextDisplay = Instance.new("TextLabel", TabBtn)
-        TextDisplay.Size = UDim2.new(0.7, 0, 1, 0) TextDisplay.Position = UDim2.new(0.28, 0, 0, 0) TextDisplay.BackgroundTransparency = 1 TextDisplay.Text = TabConfig.Name or TabConfig.Title or "Tab" TextDisplay.TextColor3 = Config.Typography.TextColor TextDisplay.TextSize = math.floor(Config.Typography.GlobalTextSize * 1.2) TextDisplay.Font = Enum.Font.GothamBold
+        TextDisplay.Size = UDim2.new(0.7, 0, 1, 0) TextDisplay.Position = UDim2.new(0.28, 0, 0, 0) TextDisplay.BackgroundTransparency = 1 TextDisplay.Text = TabConfig.Name or TabConfig.Title or "标签" TextDisplay.TextColor3 = Config.Typography.TextColor TextDisplay.TextSize = math.floor(Config.Typography.GlobalTextSize * 1.2) TextDisplay.Font = Enum.Font.GothamBold
 
         local Page = Instance.new("ScrollingFrame", ContentContainer)
         Page.Size = UDim2.new(1, -10, 1, -10) Page.Position = UDim2.fromOffset(5, 5) Page.BackgroundTransparency = 1 Page.ScrollBarThickness = 2 Page.Visible = false
@@ -282,18 +416,17 @@ function Library:CreateWindow(Settings)
             for _, v in pairs(Window.Tabs) do v.Page.Visible = false v.Button.BackgroundTransparency = 0.5 end
             Page.Visible = true TabBtn.BackgroundTransparency = 0 Window.CurrentTab = Tab
         end)
-        
         if #Window.Tabs == 0 then Page.Visible = true TabBtn.BackgroundTransparency = 0 Window.CurrentTab = Tab end
         Tab.Button = TabBtn Tab.Page = Page table.insert(Window.Tabs, Tab)
 
-        -- 标准化：添加标签/节 (兼容旧版 AddTitle)
+        -- 兼容标准命名：AddLabel, AddSection, AddTitle 都可以用
         function Tab:AddLabel(TitleText)
             Tab.ItemCount = Tab.ItemCount + 1
             local Element = Instance.new("TextLabel", Page)
             Element.LayoutOrder = Tab.ItemCount Element.Size = UDim2.new(1, 0, 0, 40) Element.BackgroundTransparency = 1 Element.Text = " " .. (TitleText or "Label") Element.TextColor3 = Config.Typography.TextColor Element.TextSize = Config.Typography.GlobalTextSize Element.Font = Enum.Font.GothamBold Element.TextXAlignment = Enum.TextXAlignment.Left
         end
-        Tab.AddSection = Tab.AddLabel 
-        Tab.AddTitle = Tab.AddLabel 
+        Tab.AddSection = Tab.AddLabel
+        Tab.AddTitle = Tab.AddLabel
 
         function Tab:AddButton(BtnConfig)
             Tab.ItemCount = Tab.ItemCount + 1
@@ -316,11 +449,9 @@ function Library:CreateWindow(Settings)
 
             local Title = Instance.new("TextLabel", Element)
             Title.Size = UDim2.new(0.8, 0, 1, 0) Title.Position = UDim2.new(0, 15, 0, 0) Title.BackgroundTransparency = 1 Title.Text = TogConfig.Name or TogConfig.Title or "Toggle" Title.TextColor3 = Config.Typography.TextColor Title.TextSize = Config.Typography.GlobalTextSize Title.Font = Config.Typography.FontType Title.TextXAlignment = Enum.TextXAlignment.Left
-            
             local SwitchBg = Instance.new("Frame", Element)
             SwitchBg.Size = UDim2.fromOffset(40, 20) SwitchBg.Position = UDim2.new(1, -55, 0.5, 0) SwitchBg.AnchorPoint = Vector2.new(0, 0.5) SwitchBg.BackgroundColor3 = ToggleVal and Color3.fromRGB(80, 220, 100) or Color3.fromRGB(70, 70, 70)
             Instance.new("UICorner", SwitchBg).CornerRadius = UDim.new(1, 0)
-            
             local Knob = Instance.new("Frame", SwitchBg)
             Knob.Size = UDim2.fromOffset(16, 16) Knob.Position = ToggleVal and UDim2.new(1, -18, 0.5, 0) or UDim2.new(0, 2, 0.5, 0) Knob.AnchorPoint = Vector2.new(0, 0.5) Knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
             Instance.new("UICorner", Knob).CornerRadius = UDim.new(1, 0)
@@ -332,18 +463,115 @@ function Library:CreateWindow(Settings)
                 if TogConfig.Callback then TogConfig.Callback(ToggleVal) end 
             end)
         end
-        -- 其他的 AddSlider / AddDropdown / AddTextbox / AddColorpicker 代码逻辑基本保持原样...
-        -- (由于这些 API 已经非常标准，只需确保内部变量命名统一即可)
 
+        function Tab:AddSlider(SliConfig)
+            Tab.ItemCount = Tab.ItemCount + 1
+            local Min, Max, Current = SliConfig.Min or 0, SliConfig.Max or 100, SliConfig.Default or (SliConfig.Min or 0)
+            local Element = Instance.new("Frame", Page)
+            Element.LayoutOrder = Tab.ItemCount Element.Size = UDim2.new(1, 0, 0, 50) Element.BackgroundColor3 = Color3.fromRGB(30, 30, 30) Element.BackgroundTransparency = 0.6
+            Instance.new("UICorner", Element).CornerRadius = UDim.new(0, 8)
+
+            local Title = Instance.new("TextLabel", Element)
+            Title.Size = UDim2.new(0.5, 0, 1, 0) Title.Position = UDim2.new(0, 15, 0, 0) Title.BackgroundTransparency = 1 Title.Text = SliConfig.Name or SliConfig.Title or "Slider" Title.TextColor3 = Config.Typography.TextColor Title.TextSize = Config.Typography.GlobalTextSize Title.Font = Config.Typography.FontType Title.TextXAlignment = Enum.TextXAlignment.Left
+            local ValueDisplay = Instance.new("TextLabel", Element)
+            ValueDisplay.Size = UDim2.new(0.15, 0, 1, 0) ValueDisplay.Position = UDim2.new(0.40, 0, 0, 0) ValueDisplay.BackgroundTransparency = 1 ValueDisplay.Text = tostring(Current) ValueDisplay.TextColor3 = Config.Typography.TextColor ValueDisplay.TextSize = 13 ValueDisplay.Font = Config.Typography.FontType
+            
+            local SliderRail = Instance.new("TextButton", Element)
+            SliderRail.Size = UDim2.new(0.35, 0, 0.2, 0) SliderRail.Position = UDim2.new(0.6, 0, 0.5, 0) SliderRail.AnchorPoint = Vector2.new(0, 0.5) SliderRail.BackgroundColor3 = Color3.fromRGB(60, 60, 60) SliderRail.Text = ""
+            Instance.new("UICorner", SliderRail).CornerRadius = UDim.new(1, 0)
+            local SliderFill = Instance.new("Frame", SliderRail)
+            SliderFill.Size = UDim2.new(math.clamp((Current - Min) / (Max - Min), 0, 1), 0, 1, 0) SliderFill.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            Instance.new("UICorner", SliderFill).CornerRadius = UDim.new(1, 0)
+
+            local sDragging = false
+            SliderRail.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then sDragging = true end end)
+            UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then sDragging = false end end)
+            UserInputService.InputChanged:Connect(function(input)
+                if sDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                    local scale = math.clamp((input.Position.X - SliderRail.AbsolutePosition.X) / SliderRail.AbsoluteSize.X, 0, 1)
+                    SliderFill.Size = UDim2.new(scale, 0, 1, 0)
+                    local value = math.floor(Min + ((Max - Min) * scale))
+                    ValueDisplay.Text = tostring(value)
+                    if SliConfig.Callback then SliConfig.Callback(value) end
+                end
+            end)
+        end
+
+        function Tab:AddColorpicker(ColConfig)
+            Tab.ItemCount = Tab.ItemCount + 1
+            local CurrentColor = ColConfig.Default or Color3.fromRGB(255, 255, 255)
+            local Element = Instance.new("Frame", Page)
+            Element.LayoutOrder = Tab.ItemCount Element.Size = UDim2.new(1, 0, 0, 50) Element.BackgroundColor3 = Color3.fromRGB(30, 30, 30) Element.BackgroundTransparency = 0.6
+            Instance.new("UICorner", Element).CornerRadius = UDim.new(0, 8)
+
+            local Title = Instance.new("TextLabel", Element)
+            Title.Size = UDim2.new(0.8, 0, 1, 0) Title.Position = UDim2.new(0, 15, 0, 0) Title.BackgroundTransparency = 1 Title.Text = ColConfig.Name or ColConfig.Title or "Colorpicker" Title.TextColor3 = Config.Typography.TextColor Title.TextSize = Config.Typography.GlobalTextSize Title.Font = Config.Typography.FontType Title.TextXAlignment = Enum.TextXAlignment.Left
+            local ColorSquare = Instance.new("TextButton", Element)
+            ColorSquare.Size = UDim2.fromOffset(Config.ColorPicker.SquareSize, Config.ColorPicker.SquareSize) ColorSquare.Position = UDim2.new(1, -35, 0.5, 0) ColorSquare.AnchorPoint = Vector2.new(0, 0.5) ColorSquare.BackgroundColor3 = CurrentColor ColorSquare.Text = ""
+            Instance.new("UICorner", ColorSquare).CornerRadius = UDim.new(0, Config.ColorPicker.SquareCorner)
+
+            ColorSquare.MouseButton1Click:Connect(function()
+                activeColorCallback = ColConfig.Callback activeColorSquare = ColorSquare
+                currentH, currentS, currentV = Color3.toHSV(CurrentColor)
+                UpdateColorUI()
+                ColorDialog.Visible = true
+                TweenService:Create(ColorDialog, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {GroupTransparency = 0}):Play()
+            end)
+        end
+
+        function Tab:AddDropdown(DropConfig)
+            Tab.ItemCount = Tab.ItemCount + 1
+            local Options, Current, IsDropped = DropConfig.Options or {}, DropConfig.Default or (DropConfig.Options and DropConfig.Options[1]) or "", false
+            local ItemHeight, MaxItems = 30, 4 local VisibleItems = math.min(#Options, MaxItems) local ExpandedHeight = 50 + (VisibleItems * ItemHeight) + 10 
+
+            local Element = Instance.new("Frame", Page)
+            Element.LayoutOrder = Tab.ItemCount Element.Size = UDim2.new(1, 0, 0, 50) Element.BackgroundColor3 = Color3.fromRGB(30, 30, 30) Element.BackgroundTransparency = 0.6 Element.ClipsDescendants = true
+            Instance.new("UICorner", Element).CornerRadius = UDim.new(0, 8)
+
+            local Title = Instance.new("TextLabel", Element)
+            Title.Size = UDim2.new(0.55, 0, 0, 50) Title.Position = UDim2.new(0, 15, 0, 0) Title.BackgroundTransparency = 1 Title.Text = DropConfig.Name or DropConfig.Title or "Dropdown" Title.TextColor3 = Config.Typography.TextColor Title.TextSize = Config.Typography.GlobalTextSize Title.Font = Config.Typography.FontType Title.TextXAlignment = Enum.TextXAlignment.Left
+            local DropBtn = Instance.new("TextButton", Element)
+            DropBtn.Size = UDim2.new(0.4, 0, 0, 34) DropBtn.Position = UDim2.new(1, -10, 0, 8) DropBtn.AnchorPoint = Vector2.new(1, 0) DropBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45) DropBtn.Text = Current DropBtn.TextColor3 = Config.Typography.TextColor DropBtn.TextSize = 13 DropBtn.Font = Config.Typography.FontType
+            Instance.new("UICorner", DropBtn).CornerRadius = UDim.new(0, 6)
+
+            local ScrollFrame = Instance.new("ScrollingFrame", Element)
+            ScrollFrame.Size = UDim2.new(0.4, 0, 1, -60) ScrollFrame.Position = UDim2.new(1, -10, 0, 50) ScrollFrame.AnchorPoint = Vector2.new(1, 0) ScrollFrame.BackgroundTransparency = 1 ScrollFrame.ScrollBarThickness = 2 ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, #Options * ItemHeight)
+            Instance.new("UIListLayout", ScrollFrame).Padding = UDim.new(0, 0)
+
+            for _, opt in pairs(Options) do
+                local OptBtn = Instance.new("TextButton", ScrollFrame)
+                OptBtn.Size = UDim2.new(1, 0, 0, ItemHeight) OptBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40) OptBtn.BackgroundTransparency = 0.5 OptBtn.Text = opt OptBtn.TextColor3 = Config.Typography.TextColor OptBtn.TextSize = 12 OptBtn.Font = Config.Typography.FontType
+                OptBtn.MouseButton1Click:Connect(function()
+                    Current = opt DropBtn.Text = Current if DropConfig.Callback then DropConfig.Callback(Current) end
+                    IsDropped = false TweenService:Create(Element, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 0, 50)}):Play()
+                end)
+            end
+            DropBtn.MouseButton1Click:Connect(function() IsDropped = not IsDropped TweenService:Create(Element, TweenInfo.new(0.2), {Size = UDim2.new(1, 0, 0, IsDropped and ExpandedHeight or 50)}):Play() end)
+        end
+
+        function Tab:AddTextbox(BoxConfig)
+            Tab.ItemCount = Tab.ItemCount + 1
+            local Element = Instance.new("Frame", Page)
+            Element.LayoutOrder = Tab.ItemCount Element.Size = UDim2.new(1, 0, 0, 50) Element.BackgroundColor3 = Color3.fromRGB(30, 30, 30) Element.BackgroundTransparency = 0.6
+            Instance.new("UICorner", Element).CornerRadius = UDim.new(0, 8)
+
+            local Title = Instance.new("TextLabel", Element)
+            Title.Size = UDim2.new(0.55, 0, 1, 0) Title.Position = UDim2.new(0, 15, 0, 0) Title.BackgroundTransparency = 1 Title.Text = BoxConfig.Name or BoxConfig.Title or "Textbox" Title.TextColor3 = Config.Typography.TextColor Title.TextSize = Config.Typography.GlobalTextSize Title.Font = Config.Typography.FontType Title.TextXAlignment = Enum.TextXAlignment.Left
+            local InputBox = Instance.new("TextBox", Element)
+            InputBox.Size = UDim2.new(0.4, 0, 0, 34) InputBox.Position = UDim2.new(1, -10, 0.5, 0) InputBox.AnchorPoint = Vector2.new(1, 0.5) InputBox.BackgroundColor3 = Color3.fromRGB(45, 45, 45) InputBox.Text = BoxConfig.Default or "" InputBox.PlaceholderText = BoxConfig.Placeholder or "输入..." InputBox.TextColor3 = Config.Typography.TextColor InputBox.TextSize = 13 InputBox.Font = Config.Typography.FontType InputBox.ClearTextOnFocus = false
+            Instance.new("UICorner", InputBox).CornerRadius = UDim.new(0, 6)
+
+            InputBox.FocusLost:Connect(function(enterPressed) if BoxConfig.Callback then BoxConfig.Callback(InputBox.Text, enterPressed) end end)
+        end
         return Tab
     end
     return Window
 end
 
--- ✨ 消息弹窗保留了你的 "D" 分隔符特殊逻辑，未做破坏，确保你原有的提示功能完美运行
+-- ✨ 消息弹窗卡片堆叠效果
 function Library:Notify(Options)
-    local TitleText = Options.Title or "Notification"
-    local ContentText = Options.Text or Options.Content or ""
+    local TitleText = Options.Title or "系统提示"
+    local ContentText = Options.Text or ""
     local ImageId = Options.Image or "" 
     local Duration = Options.Duration or 3
     local TargetY = Options.TargetHeight or 0.85 
@@ -351,7 +579,6 @@ function Library:Notify(Options)
     local StrokeColor = Options.StrokeColor or Color3.fromRGB(150, 150, 150)
     local TextColor = Options.TextColor or Color3.fromRGB(255, 255, 255)
 
-    -- 你独特的图像分割算法 (完好保留)
     local totalContentWidth = 0
     local parts = string.split(ContentText, "D")
     for i, partText in ipairs(parts) do
