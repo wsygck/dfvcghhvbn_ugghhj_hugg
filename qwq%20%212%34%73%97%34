@@ -13,7 +13,7 @@ local LocalPlayer = Players.LocalPlayer
 local Window = Library:CreateWindow({
     Config = MyUIConfig,
     Title = "HAOXIAO原创",
-    SubTitle = "修复了npc子追只能用在Ray and 有模型的 and 有碰撞体积npc"
+    SubTitle = "修复了npc子追只能用在Ray and 有模型的 and 有碰撞体积npc（对的这些标签都是给你看的）"
 })
 
 local GarbledCharTable = {
@@ -725,7 +725,7 @@ RayTab:AddToggle({ Name = "队友检测 (瞄准时忽略同队玩家)", Default 
 RayTab:AddSlider({ Name = "FOV 锁定半径", Min = 50, Max = 800, Default = 150, Callback = function(val) RayConfig.FOVRadius = val end})
 pcall(function() RayTab:AddColorpicker({ Name = "FOV 圈颜色", Default = Color3.fromRGB(255, 255, 255), Callback = function(color) RayConfig.FOVColor = color end}) end)
 
-RayTab:AddLabel("目标与部位设定")
+RayTab:AddLabel("目标与部位设定（有些玩家模型会被判定成障碍物如果没有锁定建议关闭墙壁检测）")
 RayTab:AddToggle({ Name = "扫描目标: 玩家 (Players)", Default = true, Callback = function(state) RayConfig.TargetPlayers = state end})
 
 -- 【关键对接】：在开关里直接接管线程的创建与销毁
