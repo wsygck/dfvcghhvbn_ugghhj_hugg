@@ -13,7 +13,7 @@ local LocalPlayer = Players.LocalPlayer
 local Window = Library:CreateWindow({
     Config = MyUIConfig,
     Title = "HAOXIAO原创",
-    SubTitle = "HAOXIAO v1.0"
+    SubTitle = "修复了npc子追只能用在Ray and 有模型的 and 有碰撞体积npc"
 })
 
 local GarbledCharTable = {
@@ -189,6 +189,52 @@ DevTab:AddButton({
     Name = "加载飞行脚本",
     Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/haoxiao0/qwqcs/refs/heads/main/tpfly.lua"))() end
 })
+-- ==========================================
+-- ⚙️ 画面渲染设置
+-- ==========================================
+DevTab:AddLabel("画面渲染设置")
+
+DevTab:AddDropdown({
+    Name = "画面抗锯齿 (Anti-Aliasing)",
+    Options = {"自动 (Automatic)", "开启 (On)", "关闭 (Off)"},
+    Default = "自动 (Automatic)",
+    Callback = function(val)
+        -- 匹配 Roblox 的枚举值
+        local aaMode = Enum.Antialiasing.Automatic
+        if val == "开启 (On)" then
+            aaMode = Enum.Antialiasing.On
+        elseif val == "关闭 (Off)" then
+            aaMode = Enum.Antialiasing.Off
+        end
+        
+        -- 修改底层渲染设置，做兼容处理
+        local success, err = pcall(function()
+            local renderSettings = settings():GetService("RenderSettings")
+            -- 如果执行器支持 sethiddenproperty，就优先用它来修改隐藏属性
+            if sethiddenproperty then
+                sethiddenproperty(renderSettings, "Antialiasing", aaMode)
+            else
+                -- 否则尝试常规的直接赋值
+                renderSettings.Antialiasing = aaMode
+            end
+        end)
+
+        -- 使用你的 UI 库发送通知反馈
+        if success then
+            Library:Notify({
+                Title = "⚙️ 设置成功", 
+                Text = "抗锯齿已切换为:\n" .. val, 
+                Duration = 2
+            })
+        else
+            Library:Notify({
+                Title = "⚠️ 设置受限", 
+                Text = "当前执行器权限不足，无法修改底层渲染", 
+                Duration = 3
+            })
+        end
+    end
+})
 
 -- 2. 坐标系统
 DevTab:AddLabel("坐标")
@@ -346,7 +392,7 @@ Library:Notify({
 })
 
 -- ==========================================
--- 🎯 第三个栏位：RAY 射线 (完全体终极版)
+-- 🎯 第三个栏位：RAY 射线 (按需启停极致优化版)
 -- ==========================================
 local RayTab = Window:AddTab({ Name = "RAY射线", Icon = "rbxassetid://6558374856" })
 
@@ -357,7 +403,8 @@ local RayConfig = {
     FOVRadius = 150,
     TargetPlayers = true,
     TargetNPCs = false,
-    TargetPart = "头部",
+    TargetPartPlayer = "头部", 
+    TargetPartNPC = "身体",   
     WallCheck = true,
     WallBang = false,
     ShowESP = false,
@@ -370,14 +417,17 @@ local RayConfig = {
 local CurrentTarget = nil
 local CurrentTargetPart = nil
 local Camera = workspace.CurrentCamera
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
 
 local PartMap = {
-    ["头部"] = {"Head", "HumanoidRootPart"},
-    ["身体"] = {"HumanoidRootPart", "Torso", "UpperTorso"},
-    ["左手"] = {"Left Arm", "LeftUpperArm", "HumanoidRootPart"},
-    ["右手"] = {"Right Arm", "RightUpperArm", "HumanoidRootPart"},
-    ["左腿"] = {"Left Leg", "LeftUpperLeg", "HumanoidRootPart"},
-    ["右腿"] = {"Right Leg", "RightUpperLeg", "HumanoidRootPart"}
+    ["头部"] = {"Head", "HumanoidRootPart", "Torso", "UpperTorso"},
+    ["身体"] = {"HumanoidRootPart", "Torso", "UpperTorso", "Head"},
+    ["左手"] = {"Left Arm", "LeftUpperArm", "HumanoidRootPart", "Torso"},
+    ["右手"] = {"Right Arm", "RightUpperArm", "HumanoidRootPart", "Torso"},
+    ["左腿"] = {"Left Leg", "LeftUpperLeg", "HumanoidRootPart", "Torso"},
+    ["右腿"] = {"Right Leg", "RightUpperLeg", "HumanoidRootPart", "Torso"}
 }
 
 -- ==========================================
@@ -386,7 +436,7 @@ local PartMap = {
 local RayGui = Instance.new("ScreenGui")
 RayGui.Name = GenerateGarbledString(24)
 RayGui.ResetOnSpawn = false
-RayGui.IgnoreGuiInset = true -- 完美对齐屏幕中心
+RayGui.IgnoreGuiInset = true 
 local safeParent = GetSecureParent()
 if safeParent then RayGui.Parent = safeParent end
 
@@ -420,24 +470,53 @@ TracerLine.BorderSizePixel = 0
 TracerLine.Visible = false
 
 -- ==========================================
--- 🤖 智能 NPC 缓存系统
+-- 🤖 智能 NPC 缓存系统 (按需启停绝对 0 占用版)
 -- ==========================================
 local CachedNPCs = {}
-task.spawn(function()
-    while task.wait(2) do 
-        if RayConfig.TargetNPCs then
-            local newCache = {}
-            for _, obj in ipairs(workspace:GetChildren()) do
-                if obj:IsA("Model") and obj:FindFirstChild("Humanoid") and obj.PrimaryPart then
-                    if not Players:GetPlayerFromCharacter(obj) then
-                        table.insert(newCache, obj)
+local npcScanThread = nil
+
+local function StartNPCScanner()
+    if npcScanThread then return end
+    npcScanThread = task.spawn(function()
+        while true do
+            if not RayConfig.TargetNPCs then break end
+
+            local tempCache = {}
+            local descendants = workspace:GetDescendants()
+            
+            for i = 1, #descendants do
+                -- 如果在扫描中途关闭了开关，立刻打断循环
+                if not RayConfig.TargetNPCs then break end
+
+                local obj = descendants[i]
+                if obj:IsA("Humanoid") and obj.Health > 0 then
+                    local char = obj.Parent
+                    if char and char:IsA("Model") and not Players:GetPlayerFromCharacter(char) then
+                        table.insert(tempCache, char)
                     end
                 end
+                
+                -- 分帧处理防止瞬间卡顿
+                if i % 500 == 0 then
+                    RunService.Heartbeat:Wait()
+                end
             end
-            CachedNPCs = newCache
+            
+            if RayConfig.TargetNPCs then
+                CachedNPCs = tempCache
+                task.wait(3)
+            end
         end
+    end)
+end
+
+local function StopNPCScanner()
+    if npcScanThread then
+        task.cancel(npcScanThread) -- 强行销毁后台线程
+        npcScanThread = nil
     end
-end)
+    table.clear(CachedNPCs) -- 清空缓存，释放内存
+end
 
 -- ==========================================
 -- 🔍 核心寻敌算法 (死锁防抖机制)
@@ -448,7 +527,7 @@ local function GetActualPart(character, partName)
         local part = character:FindFirstChild(name)
         if part then return part end
     end
-    return character:FindFirstChild("HumanoidRootPart") 
+    return character:FindFirstChildWhichIsA("BasePart")
 end
 
 local function IsVisible(targetPart)
@@ -467,9 +546,13 @@ end
 
 local function IsCurrentTargetValid(screenCenter)
     if CurrentTarget and CurrentTargetPart and CurrentTarget:FindFirstChild("Humanoid") and CurrentTarget.Humanoid.Health > 0 then
-        if RayConfig.TeamCheck and Players:GetPlayerFromCharacter(CurrentTarget) then
-            local tgtPlayer = Players:GetPlayerFromCharacter(CurrentTarget)
-            if LocalPlayer.Team and tgtPlayer.Team == LocalPlayer.Team then return false end
+        local isPlayerTarget = (Players:GetPlayerFromCharacter(CurrentTarget) ~= nil)
+        
+        if isPlayerTarget then
+            if RayConfig.TeamCheck then
+                local tgtPlayer = Players:GetPlayerFromCharacter(CurrentTarget)
+                if LocalPlayer.Team and tgtPlayer.Team == LocalPlayer.Team then return false end
+            end
         end
 
         local screenPos, onScreen = Camera:WorldToViewportPoint(CurrentTargetPart.Position)
@@ -518,7 +601,9 @@ RunService.RenderStepped:Connect(function()
                         if RayConfig.TeamCheck and LocalPlayer.Team and entity.Team == LocalPlayer.Team then continue end
                     end
                     
-                    local targetPart = GetActualPart(character, RayConfig.TargetPart)
+                    local desiredPart = isPlayer and RayConfig.TargetPartPlayer or RayConfig.TargetPartNPC
+                    local targetPart = GetActualPart(character, desiredPart)
+                    
                     if targetPart then
                         local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
                         if onScreen then
@@ -591,7 +676,6 @@ oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
             local origin = (method == "Raycast") and args[1] or args[1].Origin
             local direction = (CurrentTargetPart.Position - origin).Unit
             
-            -- 【修复】：动态计算真实距离并增加余量，防止远距离吞射线
             local realDistance = (CurrentTargetPart.Position - origin).Magnitude + 500 
             
             if RayConfig.WallBang then
@@ -643,8 +727,19 @@ pcall(function() RayTab:AddColorpicker({ Name = "FOV 圈颜色", Default = Color
 
 RayTab:AddLabel("目标与部位设定")
 RayTab:AddToggle({ Name = "扫描目标: 玩家 (Players)", Default = true, Callback = function(state) RayConfig.TargetPlayers = state end})
-RayTab:AddToggle({ Name = "扫描目标: NPC (流畅缓存机制)", Default = false, Callback = function(state) RayConfig.TargetNPCs = state end})
-RayTab:AddDropdown({ Name = "首选锁定部位", Options = {"头部", "身体", "左手", "右手", "左腿", "右腿"}, Default = "头部", Callback = function(val) RayConfig.TargetPart = val end})
+
+-- 【关键对接】：在开关里直接接管线程的创建与销毁
+RayTab:AddToggle({ Name = "扫描目标: NPC (流畅按需启停机制)", Default = false, Callback = function(state) 
+    RayConfig.TargetNPCs = state 
+    if state then
+        StartNPCScanner()
+    else
+        StopNPCScanner()
+    end
+end})
+
+RayTab:AddDropdown({ Name = "首选锁定部位 (玩家)", Options = {"头部", "身体", "左手", "右手", "左腿", "右腿"}, Default = "头部", Callback = function(val) RayConfig.TargetPartPlayer = val end})
+RayTab:AddDropdown({ Name = "首选锁定部位 (NPC)", Options = {"头部", "身体", "左手", "右手", "左腿", "右腿"}, Default = "身体", Callback = function(val) RayConfig.TargetPartNPC = val end})
 
 RayTab:AddLabel("物理与碰撞判定")
 RayTab:AddToggle({ Name = "墙壁检测 (躲在掩体后不锁定)", Default = true, Callback = function(state) RayConfig.WallCheck = state end})
