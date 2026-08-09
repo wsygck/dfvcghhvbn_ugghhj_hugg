@@ -714,9 +714,9 @@ end))
 -- ==========================================
 -- 🎛️ UI 菜单控件绑定
 -- ==========================================
-RayTab:AddLabel("射线核心控制 (Delta Hook)")
+RayTab:AddLabel("子追Ray有些服务器别开子弹穿墙容易被抓，那种开起来很卡的就别开子弹穿墙")
 
-RayTab:AddToggle({ Name = "开启 RAY 射线系统 (含FOV)", Default = false, Callback = function(state) 
+RayTab:AddToggle({ Name = "开启 RAY ", Default = false, Callback = function(state) 
     RayConfig.Enabled = state 
 end})
 
