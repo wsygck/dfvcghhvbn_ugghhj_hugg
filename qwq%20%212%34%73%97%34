@@ -12,8 +12,8 @@ local LocalPlayer = Players.LocalPlayer
 
 local Window = Library:CreateWindow({
     Config = MyUIConfig,
-    Title = "修复NPC子追",
-    SubTitle = "HAOXIAO（修复了找不到npc，更新了强力吸附和距离准星最近的选择）"
+    Title = "修复了寻找NPC出错",
+    SubTitle = "HAOXIAO 修复了卡顿相机,忽略30米内的射线,优化脚本性能"
 })
 
 local GarbledCharTable = {
@@ -392,7 +392,7 @@ Library:Notify({
 })
 
 -- ==========================================
--- 🎯 第三个栏位：RAY 射线 (基于旧版的纯净修复版)
+-- 🎯 第三个栏位：RAY 射线 (短射线过滤稳定版)
 -- ==========================================
 local RayTab = Window:AddTab({ Name = "RAY射线", Icon = "rbxassetid://6558374856" })
 
@@ -689,7 +689,7 @@ local function StopRayLoop()
 end
 
 -- ==========================================
--- ⚡ Delta 专属底层拦截 (延迟挂载 Hook)
+-- ⚡ Delta 专属底层拦截 (仅新增 30 长度过滤)
 -- ==========================================
 local oldNamecall
 local isHooked = false
@@ -700,6 +700,10 @@ local function InitRayHook()
 
     oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
         local method = getnamecallmethod()
+        
+        -- 【防护】：防止脚本自身的射线操作触发死循环
+        if checkcaller and checkcaller() then return oldNamecall(self, ...) end
+        
         local args = {...}
 
         if RayConfig.Enabled and CurrentTargetPart then
@@ -714,6 +718,15 @@ local function InitRayHook()
                 end
 
                 local origin = (method == "Raycast") and args[1] or args[1].Origin
+                
+                -- 【核心新增】：获取原始射线的方向与长度
+                local originalDir = (method == "Raycast") and args[2] or args[1].Direction
+                
+                -- 【精准修复】：过滤掉长度小于 30 的射线 (直接放行人物探地/爬墙等物理短射线)
+                if originalDir and originalDir.Magnitude < 30 then
+                    return oldNamecall(self, ...)
+                end
+
                 local direction = (CurrentTargetPart.Position - origin).Unit
                 
                 local realDistance = (CurrentTargetPart.Position - origin).Magnitude + 500 
