@@ -13,7 +13,7 @@ local LocalPlayer = Players.LocalPlayer
 local Window = Library:CreateWindow({
     Config = MyUIConfig,
     Title = "修复NPC子追",
-    SubTitle = "HAOXIAO（修复了找不到npc）"
+    SubTitle = "HAOXIAO（修复了找不到npc，更新了强力吸附和距离准星最近的选择）"
 })
 
 local GarbledCharTable = {
