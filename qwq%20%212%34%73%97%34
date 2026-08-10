@@ -12,8 +12,8 @@ local LocalPlayer = Players.LocalPlayer
 
 local Window = Library:CreateWindow({
     Config = MyUIConfig,
-    Title = "有风险少玩",
-    SubTitle = "修复了npc子追只能用在Ray and 有模型的 and 有碰撞体积npc（对的这些标签都是给你看的）"
+    Title = "修复NPC子追",
+    SubTitle = "HAOXIAO（修复了找不到npc）"
 })
 
 local GarbledCharTable = {
@@ -392,7 +392,7 @@ Library:Notify({
 })
 
 -- ==========================================
--- 🎯 第三个栏位：RAY 射线 (按需启停极致优化版)
+-- 🎯 第三个栏位：RAY 射线 (基于旧版的纯净修复版)
 -- ==========================================
 local RayTab = Window:AddTab({ Name = "RAY射线", Icon = "rbxassetid://6558374856" })
 
@@ -401,6 +401,7 @@ local RayConfig = {
     Enabled = false,
     TeamCheck = true,
     FOVRadius = 150,
+    TargetMode = "距离准星最近",
     TargetPlayers = true,
     TargetNPCs = false,
     TargetPartPlayer = "头部", 
@@ -431,46 +432,55 @@ local PartMap = {
 }
 
 -- ==========================================
--- 🛡️ UI 与视觉层 (乱码加密保护)
+-- 🛡️ UI 变量预留 (延迟初始化)
 -- ==========================================
-local RayGui = Instance.new("ScreenGui")
-RayGui.Name = GenerateGarbledString(24)
-RayGui.ResetOnSpawn = false
-RayGui.IgnoreGuiInset = true 
-local safeParent = GetSecureParent()
-if safeParent then RayGui.Parent = safeParent end
+local RayGui, FovFrame, FovStroke, EspDot, TracerLine
+local uiInitialized = false
 
-local FovFrame = Instance.new("Frame", RayGui)
-FovFrame.Name = GenerateGarbledString(16)
-FovFrame.BackgroundTransparency = 1
-FovFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-FovFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-FovFrame.Size = UDim2.fromOffset(RayConfig.FOVRadius * 2, RayConfig.FOVRadius * 2)
-FovFrame.Visible = false
-local FovCorner = Instance.new("UICorner", FovFrame)
-FovCorner.CornerRadius = UDim.new(1, 0)
-local FovStroke = Instance.new("UIStroke", FovFrame)
-FovStroke.Color = RayConfig.FOVColor
-FovStroke.Thickness = 1
-FovStroke.Transparency = 0.3
+local function InitRayUI()
+    if uiInitialized then return end
+    uiInitialized = true
 
-local EspDot = Instance.new("Frame", RayGui)
-EspDot.Name = GenerateGarbledString(12)
-EspDot.AnchorPoint = Vector2.new(0.5, 0.5)
-EspDot.Size = UDim2.fromOffset(RayConfig.DotSize, RayConfig.DotSize)
-EspDot.BackgroundColor3 = RayConfig.DotColor
-EspDot.Visible = false
-Instance.new("UICorner", EspDot).CornerRadius = UDim.new(1, 0)
+    RayGui = Instance.new("ScreenGui")
+    RayGui.Name = GenerateGarbledString(24)
+    RayGui.ResetOnSpawn = false
+    RayGui.IgnoreGuiInset = true 
+    local safeParent = GetSecureParent()
+    if safeParent then RayGui.Parent = safeParent end
 
-local TracerLine = Instance.new("Frame", RayGui)
-TracerLine.Name = GenerateGarbledString(12)
-TracerLine.AnchorPoint = Vector2.new(0.5, 0.5)
-TracerLine.BackgroundColor3 = RayConfig.TracerColor
-TracerLine.BorderSizePixel = 0
-TracerLine.Visible = false
+    FovFrame = Instance.new("Frame", RayGui)
+    FovFrame.Name = GenerateGarbledString(16)
+    FovFrame.BackgroundTransparency = 1
+    FovFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+    FovFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+    FovFrame.Size = UDim2.fromOffset(RayConfig.FOVRadius * 2, RayConfig.FOVRadius * 2)
+    FovFrame.Visible = false
+    local FovCorner = Instance.new("UICorner", FovFrame)
+    FovCorner.CornerRadius = UDim.new(1, 0)
+    
+    FovStroke = Instance.new("UIStroke", FovFrame)
+    FovStroke.Color = RayConfig.FOVColor
+    FovStroke.Thickness = 1
+    FovStroke.Transparency = 0.3
+
+    EspDot = Instance.new("Frame", RayGui)
+    EspDot.Name = GenerateGarbledString(12)
+    EspDot.AnchorPoint = Vector2.new(0.5, 0.5)
+    EspDot.Size = UDim2.fromOffset(RayConfig.DotSize, RayConfig.DotSize)
+    EspDot.BackgroundColor3 = RayConfig.DotColor
+    EspDot.Visible = false
+    Instance.new("UICorner", EspDot).CornerRadius = UDim.new(1, 0)
+
+    TracerLine = Instance.new("Frame", RayGui)
+    TracerLine.Name = GenerateGarbledString(12)
+    TracerLine.AnchorPoint = Vector2.new(0.5, 0.5)
+    TracerLine.BackgroundColor3 = RayConfig.TracerColor
+    TracerLine.BorderSizePixel = 0
+    TracerLine.Visible = false
+end
 
 -- ==========================================
--- 🤖 智能 NPC 缓存系统 (按需启停绝对 0 占用版)
+-- 🤖 智能 NPC 缓存系统 (基于旧版的泛型修复)
 -- ==========================================
 local CachedNPCs = {}
 local npcScanThread = nil
@@ -479,30 +489,25 @@ local function StartNPCScanner()
     if npcScanThread then return end
     npcScanThread = task.spawn(function()
         while true do
-            if not RayConfig.TargetNPCs then break end
+            if not RayConfig.TargetNPCs or not RayConfig.Enabled then break end
 
             local tempCache = {}
             local descendants = workspace:GetDescendants()
             
             for i = 1, #descendants do
-                -- 如果在扫描中途关闭了开关，立刻打断循环
-                if not RayConfig.TargetNPCs then break end
+                if not RayConfig.TargetNPCs or not RayConfig.Enabled then break end
 
                 local obj = descendants[i]
-                if obj:IsA("Humanoid") and obj.Health > 0 then
-                    local char = obj.Parent
-                    if char and char:IsA("Model") and not Players:GetPlayerFromCharacter(char) then
-                        table.insert(tempCache, char)
+                -- 【修复漏怪】：放宽条件，只要是模型且包含核心部件就算怪物
+                if obj:IsA("Model") and not Players:GetPlayerFromCharacter(obj) then
+                    if obj:FindFirstChildWhichIsA("Humanoid") or obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Torso") then
+                        table.insert(tempCache, obj)
                     end
                 end
-                
-                -- 分帧处理防止瞬间卡顿
-                if i % 500 == 0 then
-                    RunService.Heartbeat:Wait()
-                end
+                if i % 500 == 0 then RunService.Heartbeat:Wait() end
             end
             
-            if RayConfig.TargetNPCs then
+            if RayConfig.TargetNPCs and RayConfig.Enabled then
                 CachedNPCs = tempCache
                 task.wait(3)
             end
@@ -512,15 +517,17 @@ end
 
 local function StopNPCScanner()
     if npcScanThread then
-        task.cancel(npcScanThread) -- 强行销毁后台线程
+        task.cancel(npcScanThread) 
         npcScanThread = nil
     end
-    table.clear(CachedNPCs) -- 清空缓存，释放内存
+    table.clear(CachedNPCs)
 end
 
 -- ==========================================
--- 🔍 核心寻敌算法 (死锁防抖机制)
+-- 🔍 核心寻敌算法 (双模式无缝切换)
 -- ==========================================
+local renderConnection = nil
+
 local function GetActualPart(character, partName)
     local fallbacks = PartMap[partName]
     for _, name in ipairs(fallbacks) do
@@ -530,6 +537,7 @@ local function GetActualPart(character, partName)
     return character:FindFirstChildWhichIsA("BasePart")
 end
 
+-- 保持旧版基础墙壁检测，原汁原味
 local function IsVisible(targetPart)
     local origin = Camera.CFrame.Position
     local direction = (targetPart.Position - origin)
@@ -544,8 +552,16 @@ local function IsVisible(targetPart)
     return true
 end
 
+-- 辅助判断存活（兼容没有 Humanoid 的怪物）
+local function IsEntityAlive(char)
+    if not char then return false end
+    local hum = char:FindFirstChildWhichIsA("Humanoid")
+    if hum then return hum.Health > 0 end
+    return true 
+end
+
 local function IsCurrentTargetValid(screenCenter)
-    if CurrentTarget and CurrentTargetPart and CurrentTarget:FindFirstChild("Humanoid") and CurrentTarget.Humanoid.Health > 0 then
+    if CurrentTarget and CurrentTargetPart and IsEntityAlive(CurrentTarget) then
         local isPlayerTarget = (Players:GetPlayerFromCharacter(CurrentTarget) ~= nil)
         
         if isPlayerTarget then
@@ -569,155 +585,190 @@ local function IsCurrentTargetValid(screenCenter)
     return false
 end
 
-RunService.RenderStepped:Connect(function()
-    FovFrame.Size = UDim2.fromOffset(RayConfig.FOVRadius * 2, RayConfig.FOVRadius * 2)
-    FovStroke.Color = RayConfig.FOVColor
-    EspDot.Size = UDim2.fromOffset(RayConfig.DotSize, RayConfig.DotSize)
-    EspDot.BackgroundColor3 = RayConfig.DotColor
-    TracerLine.BackgroundColor3 = RayConfig.TracerColor
+local function StartRayLoop()
+    if renderConnection then return end
+    renderConnection = RunService.RenderStepped:Connect(function()
+        if not RayConfig.Enabled or not uiInitialized then return end
 
-    if not RayConfig.Enabled then 
-        FovFrame.Visible = false
-        EspDot.Visible = false
-        TracerLine.Visible = false
-        CurrentTarget = nil
-        return 
-    end
+        FovFrame.Size = UDim2.fromOffset(RayConfig.FOVRadius * 2, RayConfig.FOVRadius * 2)
+        FovStroke.Color = RayConfig.FOVColor
+        EspDot.Size = UDim2.fromOffset(RayConfig.DotSize, RayConfig.DotSize)
+        EspDot.BackgroundColor3 = RayConfig.DotColor
+        TracerLine.BackgroundColor3 = RayConfig.TracerColor
 
-    FovFrame.Visible = true 
-    local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-
-    if not IsCurrentTargetValid(screenCenter) then
-        local closestDist = RayConfig.FOVRadius
-        local bestTarget = nil
-        local bestPart = nil
+        FovFrame.Visible = true 
+        local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
         
-        local function ScanEntities(entityList, isPlayer)
-            for _, entity in ipairs(entityList) do
-                local character = isPlayer and entity.Character or entity
-                if character and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0 then
-                    if isPlayer then
-                        if entity == LocalPlayer then continue end
-                        if RayConfig.TeamCheck and LocalPlayer.Team and entity.Team == LocalPlayer.Team then continue end
-                    end
-                    
-                    local desiredPart = isPlayer and RayConfig.TargetPartPlayer or RayConfig.TargetPartNPC
-                    local targetPart = GetActualPart(character, desiredPart)
-                    
-                    if targetPart then
-                        local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
-                        if onScreen then
-                            local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
-                            if dist < closestDist then
-                                if RayConfig.WallCheck and not RayConfig.WallBang then
-                                    if not IsVisible(targetPart) then continue end
+        local needsNewScan = true
+        
+        if RayConfig.TargetMode == "死锁机制 (咬住不放)" then
+            if IsCurrentTargetValid(screenCenter) then
+                needsNewScan = false 
+            end
+        end
+
+        if needsNewScan then
+            local closestDist = RayConfig.FOVRadius
+            local bestTarget = nil
+            local bestPart = nil
+            
+            local function ScanEntities(entityList, isPlayer)
+                for _, entity in ipairs(entityList) do
+                    local character = isPlayer and entity.Character or entity
+                    if character and IsEntityAlive(character) then
+                        if isPlayer then
+                            if entity == LocalPlayer then continue end
+                            if RayConfig.TeamCheck and LocalPlayer.Team and entity.Team == LocalPlayer.Team then continue end
+                        end
+                        
+                        local desiredPart = isPlayer and RayConfig.TargetPartPlayer or RayConfig.TargetPartNPC
+                        local targetPart = GetActualPart(character, desiredPart)
+                        
+                        if targetPart then
+                            local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
+                            if onScreen then
+                                local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
+                                if dist < closestDist then
+                                    if RayConfig.WallCheck and not RayConfig.WallBang then
+                                        if not IsVisible(targetPart) then continue end
+                                    end
+                                    closestDist = dist
+                                    bestTarget = character
+                                    bestPart = targetPart
                                 end
-                                closestDist = dist
-                                bestTarget = character
-                                bestPart = targetPart
                             end
                         end
                     end
                 end
             end
+
+            if RayConfig.TargetPlayers then ScanEntities(Players:GetPlayers(), true) end
+            if RayConfig.TargetNPCs then ScanEntities(CachedNPCs, false) end
+
+            CurrentTarget = bestTarget
+            CurrentTargetPart = bestPart
         end
 
-        if RayConfig.TargetPlayers then ScanEntities(Players:GetPlayers(), true) end
-        if RayConfig.TargetNPCs then ScanEntities(CachedNPCs, false) end
-
-        CurrentTarget = bestTarget
-        CurrentTargetPart = bestPart
-    end
-
-    if RayConfig.ShowESP and CurrentTargetPart then
-        local screenPos, onScreen = Camera:WorldToViewportPoint(CurrentTargetPart.Position)
-        if onScreen then
-            EspDot.Position = UDim2.new(0, screenPos.X, 0, screenPos.Y)
-            EspDot.Visible = true
-            
-            local targetVector = Vector2.new(screenPos.X, screenPos.Y)
-            local distance = (targetVector - screenCenter).Magnitude
-            local centerPoint = (targetVector + screenCenter) / 2
-            local angle = math.deg(math.atan2(targetVector.Y - screenCenter.Y, targetVector.X - screenCenter.X))
-            
-            TracerLine.Size = UDim2.new(0, distance, 0, 1.5)
-            TracerLine.Position = UDim2.new(0, centerPoint.X, 0, centerPoint.Y)
-            TracerLine.Rotation = angle
-            TracerLine.Visible = true
+        if RayConfig.ShowESP and CurrentTargetPart then
+            local screenPos, onScreen = Camera:WorldToViewportPoint(CurrentTargetPart.Position)
+            if onScreen then
+                EspDot.Position = UDim2.new(0, screenPos.X, 0, screenPos.Y)
+                EspDot.Visible = true
+                
+                local targetVector = Vector2.new(screenPos.X, screenPos.Y)
+                local distance = (targetVector - screenCenter).Magnitude
+                local centerPoint = (targetVector + screenCenter) / 2
+                local angle = math.deg(math.atan2(targetVector.Y - screenCenter.Y, targetVector.X - screenCenter.X))
+                
+                TracerLine.Size = UDim2.new(0, distance, 0, 1.5)
+                TracerLine.Position = UDim2.new(0, centerPoint.X, 0, centerPoint.Y)
+                TracerLine.Rotation = angle
+                TracerLine.Visible = true
+            else
+                EspDot.Visible = false
+                TracerLine.Visible = false
+            end
         else
             EspDot.Visible = false
             TracerLine.Visible = false
         end
-    else
+    end)
+end
+
+local function StopRayLoop()
+    if renderConnection then
+        renderConnection:Disconnect()
+        renderConnection = nil
+    end
+    if uiInitialized then
+        FovFrame.Visible = false
         EspDot.Visible = false
         TracerLine.Visible = false
     end
-end)
+    CurrentTarget = nil
+end
 
 -- ==========================================
--- ⚡ Delta 专属底层拦截 (动态距离白名单穿墙版)
+-- ⚡ Delta 专属底层拦截 (延迟挂载 Hook)
 -- ==========================================
 local oldNamecall
-oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
-    local method = getnamecallmethod()
-    local args = {...}
+local isHooked = false
 
-    if RayConfig.Enabled and CurrentTargetPart then
-        if method == "Raycast" or method == "FindPartOnRay" or method == "FindPartOnRayWithIgnoreList" or method == "FindPartOnRayWithWhitelist" then
-            
-            local caller = getcallingscript()
-            if caller then
-                local callerName = caller.Name
-                if callerName == "CameraModule" or callerName == "ControlModule" or callerName == "PlayerModule" or callerName == "PlayerScripts" then
-                    return oldNamecall(self, ...)
-                end
-            end
+local function InitRayHook()
+    if isHooked then return end
+    isHooked = true
 
-            local origin = (method == "Raycast") and args[1] or args[1].Origin
-            local direction = (CurrentTargetPart.Position - origin).Unit
-            
-            local realDistance = (CurrentTargetPart.Position - origin).Magnitude + 500 
-            
-            if RayConfig.WallBang then
-                if method == "Raycast" then
-                    args[1] = origin
-                    args[2] = direction * realDistance
-                    
-                    local wlParams = RaycastParams.new()
-                    wlParams.FilterType = Enum.RaycastFilterType.Include
-                    wlParams.FilterDescendantsInstances = {CurrentTargetPart.Parent}
-                    wlParams.IgnoreWater = true
-                    args[3] = wlParams
-                    
-                elseif method == "FindPartOnRayWithIgnoreList" or method == "FindPartOnRay" then
-                    setnamecallmethod("FindPartOnRayWithWhitelist")
-                    args[1] = Ray.new(origin, direction * realDistance)
-                    args[2] = {CurrentTargetPart.Parent} 
-                elseif method == "FindPartOnRayWithWhitelist" then
-                    args[1] = Ray.new(origin, direction * realDistance)
-                    args[2] = {CurrentTargetPart.Parent}
+    oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+        local args = {...}
+
+        if RayConfig.Enabled and CurrentTargetPart then
+            if method == "Raycast" or method == "FindPartOnRay" or method == "FindPartOnRayWithIgnoreList" or method == "FindPartOnRayWithWhitelist" then
+                
+                local caller = getcallingscript()
+                if caller then
+                    local callerName = caller.Name
+                    if callerName == "CameraModule" or callerName == "ControlModule" or callerName == "PlayerModule" or callerName == "PlayerScripts" then
+                        return oldNamecall(self, ...)
+                    end
                 end
-            else
-                if method == "Raycast" then
-                    args[2] = direction * realDistance
+
+                local origin = (method == "Raycast") and args[1] or args[1].Origin
+                local direction = (CurrentTargetPart.Position - origin).Unit
+                
+                local realDistance = (CurrentTargetPart.Position - origin).Magnitude + 500 
+                
+                if RayConfig.WallBang then
+                    if method == "Raycast" then
+                        args[1] = origin
+                        args[2] = direction * realDistance
+                        
+                        local wlParams = RaycastParams.new()
+                        wlParams.FilterType = Enum.RaycastFilterType.Include
+                        -- 【极速白名单保留】：仅此一项优化保留，防止打人时严重掉帧
+                        wlParams.FilterDescendantsInstances = {CurrentTargetPart}
+                        wlParams.IgnoreWater = true
+                        args[3] = wlParams
+                        
+                    elseif method == "FindPartOnRayWithIgnoreList" or method == "FindPartOnRay" then
+                        setnamecallmethod("FindPartOnRayWithWhitelist")
+                        args[1] = Ray.new(origin, direction * realDistance)
+                        args[2] = {CurrentTargetPart} 
+                    elseif method == "FindPartOnRayWithWhitelist" then
+                        args[1] = Ray.new(origin, direction * realDistance)
+                        args[2] = {CurrentTargetPart}
+                    end
                 else
-                    args[1] = Ray.new(origin, direction * realDistance)
+                    if method == "Raycast" then
+                        args[2] = direction * realDistance
+                    else
+                        args[1] = Ray.new(origin, direction * realDistance)
+                    end
                 end
+                return oldNamecall(self, unpack(args))
             end
-            return oldNamecall(self, unpack(args))
         end
-    end
-    
-    return oldNamecall(self, ...)
-end))
+        
+        return oldNamecall(self, ...)
+    end))
+end
 
 -- ==========================================
 -- 🎛️ UI 菜单控件绑定
 -- ==========================================
-RayTab:AddLabel("子追Ray有些服务器别开子弹穿墙容易被抓，那种开起来很卡的就别开子弹穿墙")
+RayTab:AddLabel("射线核心控制 (按需加载版)")
 
-RayTab:AddToggle({ Name = "开启 RAY ", Default = false, Callback = function(state) 
+RayTab:AddToggle({ Name = "开启 RAY 射线系统 (含FOV)", Default = false, Callback = function(state) 
     RayConfig.Enabled = state 
+    if state then
+        InitRayUI()       
+        InitRayHook()     
+        StartRayLoop()    
+        if RayConfig.TargetNPCs then StartNPCScanner() end
+    else
+        StopRayLoop()     
+        StopNPCScanner()  
+    end
 end})
 
 RayTab:AddToggle({ Name = "队友检测 (瞄准时忽略同队玩家)", Default = true, Callback = function(state) RayConfig.TeamCheck = state end})
@@ -725,13 +776,20 @@ RayTab:AddToggle({ Name = "队友检测 (瞄准时忽略同队玩家)", Default 
 RayTab:AddSlider({ Name = "FOV 锁定半径", Min = 50, Max = 800, Default = 150, Callback = function(val) RayConfig.FOVRadius = val end})
 pcall(function() RayTab:AddColorpicker({ Name = "FOV 圈颜色", Default = Color3.fromRGB(255, 255, 255), Callback = function(color) RayConfig.FOVColor = color end}) end)
 
-RayTab:AddLabel("目标与部位设定（有些玩家模型会被判定成障碍物如果没有锁定建议关闭墙壁检测）")
+RayTab:AddLabel("目标与部位设定")
+
+RayTab:AddDropdown({ 
+    Name = "瞄准锁定模式", 
+    Options = {"距离准星最近", "死锁机制 (咬住不放)"}, 
+    Default = "距离准星最近", 
+    Callback = function(val) RayConfig.TargetMode = val end 
+})
+
 RayTab:AddToggle({ Name = "扫描目标: 玩家 (Players)", Default = true, Callback = function(state) RayConfig.TargetPlayers = state end})
 
--- 【关键对接】：在开关里直接接管线程的创建与销毁
-RayTab:AddToggle({ Name = "扫描目标: NPC (流畅按需启停机制)", Default = false, Callback = function(state) 
+RayTab:AddToggle({ Name = "扫描目标: NPC (按需启停)", Default = false, Callback = function(state) 
     RayConfig.TargetNPCs = state 
-    if state then
+    if state and RayConfig.Enabled then
         StartNPCScanner()
     else
         StopNPCScanner()
@@ -743,7 +801,7 @@ RayTab:AddDropdown({ Name = "首选锁定部位 (NPC)", Options = {"头部", "�
 
 RayTab:AddLabel("物理与碰撞判定")
 RayTab:AddToggle({ Name = "墙壁检测 (躲在掩体后不锁定)", Default = true, Callback = function(state) RayConfig.WallCheck = state end})
-RayTab:AddToggle({ Name = "强制射线穿墙 (白名单过滤建筑)", Default = false, Callback = function(state) RayConfig.WallBang = state end})
+RayTab:AddToggle({ Name = "强制射线穿墙 (极致单点白名单)", Default = false, Callback = function(state) RayConfig.WallBang = state end})
 
 RayTab:AddLabel("视觉反馈 (连线与圆点)")
 RayTab:AddToggle({ Name = "显示部位圆点与中心连线", Default = false, Callback = function(state) RayConfig.ShowESP = state end})
