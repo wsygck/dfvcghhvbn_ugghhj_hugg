@@ -12,8 +12,8 @@ local LocalPlayer = Players.LocalPlayer
 
 local Window = Library:CreateWindow({
     Config = MyUIConfig,
-    Title = "修复了寻找NPC出错",
-    SubTitle = "HAOXIAO 修复了卡顿相机,忽略30米内的射线,优化脚本性能"
+    Title = "动画包",
+    SubTitle = "^ᐡ•͈ ·̭ •͈ᐡ"
 })
 
 
