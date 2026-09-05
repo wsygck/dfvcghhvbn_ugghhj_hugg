@@ -1,0 +1,293 @@
+local ConfigUrl = "https://raw.githubusercontent.com/wsygck/dfvcghhvbn_ugghhj_hugg/refs/heads/main/%2590%2512%25122%2527%25192%251%2519282%2512%2513%2511"
+local LibraryUrl = "https://raw.githubusercontent.com/wsygck/dfvcghhvbn_ugghhj_hugg/refs/heads/main/%25183%2512%25300%2500%25121%2556%25%2523%25"
+
+local MyUIConfig = loadstring(game:HttpGet(ConfigUrl))()
+local Library = loadstring(game:HttpGet(LibraryUrl))()
+
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local Stats = game:GetService("Stats")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local Window = Library:CreateWindow({
+    Config = MyUIConfig,
+    Title = "修复了寻找NPC出错",
+    SubTitle = "HAOXIAO 修复了卡顿相机,忽略30米内的射线,优化脚本性能"
+})
+
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- ==========================================
+-- 📦 1. 核心动作数据字典 (整合所有16款动作包)
+-- ==========================================
+local AnimPacks = {
+    ["啊摇尾巴动作包"] = {
+        idle = {"rbxassetid://88212525150688", "rbxassetid://88212525150688"},
+        walk = "rbxassetid://124771611518572", run = "rbxassetid://136336776520965",
+        jump = "rbxassetid://80837560162394", fall = "rbxassetid://104594903909683",
+        climb = "rbxassetid://112630540408116", swim = "rbxassetid://98596828035441"
+    },
+    ["忍者动作包"] = {
+        idle = {"rbxassetid://10921155160", "rbxassetid://10921155867"},
+        walk = "rbxassetid://10921162768", run = "rbxassetid://10921157929",
+        jump = "rbxassetid://10921160088", fall = "rbxassetid://10921159222",
+        climb = "rbxassetid://10921154678", swim = "rbxassetid://10921161002"
+    },
+    ["日漫画可爱动作包"] = {
+        idle = {"rbxassetid://137434897497548", "rbxassetid://74642942460483"},
+        walk = "rbxassetid://127225112023620", run = "rbxassetid://77691616369709",
+        jump = "rbxassetid://134473289142802", fall = "rbxassetid://96117211674694",
+        climb = "rbxassetid://87078664208712", swim = "rbxassetid://132215269798358"
+    },
+    ["吊的女神动作包"] = {
+        idle = {"rbxassetid://125002802413463", "rbxassetid://135832836685353"},
+        walk = "rbxassetid://89565112287783", run = "rbxassetid://96071091521000",
+        jump = "rbxassetid://101775864038046", fall = "rbxassetid://123267706208603",
+        climb = "rbxassetid://82648420312191", swim = "rbxassetid://71670155016522"
+    },
+    ["滑冰动作包"] = {
+        idle = {"rbxassetid://122257458498464", "rbxassetid://102357151005774"},
+        walk = "rbxassetid://122150855457006", run = "rbxassetid://82598234841035",
+        jump = "rbxassetid://75290611992385", fall = "rbxassetid://98600215928904",
+        climb = "rbxassetid://88763136693023", swim = "rbxassetid://133308483266208"
+    },
+    ["开朗可爱动作包"] = {
+        idle = {"rbxassetid://85735421117197", "rbxassetid://136463789054516"},
+        walk = "rbxassetid://140409718187215", run = "rbxassetid://118375157537412",
+        jump = "rbxassetid://132381016103721", fall = "rbxassetid://77496925287217",
+        climb = "rbxassetid://86318575131600", swim = "rbxassetid://95599821412670"
+    },
+    ["可爱弹跳"] = {
+        idle = {"rbxassetid://88464649697812", "rbxassetid://120712697072374"},
+        walk = "rbxassetid://98713727778027", run = "rbxassetid://133955346539948",
+        jump = "rbxassetid://124147147418885", fall = "rbxassetid://128620818122982",
+        climb = "rbxassetid://95542189442725", swim = "rbxassetid://98638030176770"
+    },
+    ["可爱动作包"] = {
+        idle = {"rbxassetid://129751609795815", "rbxassetid://92673966405462"},
+        walk = "rbxassetid://108479080422700", run = "rbxassetid://110214401895794",
+        jump = "rbxassetid://129651604409685", fall = "rbxassetid://112877405205904",
+        climb = "rbxassetid://83476547305941", swim = "rbxassetid://82127177575684"
+    },
+    ["老派动作包"] = {
+        idle = {"rbxassetid://10921230744", "rbxassetid://10921232093"},
+        walk = "rbxassetid://10921244891", run = "rbxassetid://10921240218",
+        jump = "rbxassetid://10921242013", fall = "rbxassetid://10921241244",
+        climb = "rbxassetid://10921229866", swim = "rbxassetid://10921243048"
+    },
+    ["丧尸动作包"] = {
+        idle = {"rbxassetid://10921344533", "rbxassetid://10921345304"},
+        walk = "rbxassetid://10921355261", run = "rbxassetid://616163682",
+        jump = "rbxassetid://10921351278", fall = "rbxassetid://10921350320",
+        climb = "rbxassetid://10921343576", swim = "rbxassetid://10921352344"
+    },
+    ["悬浮坐姿动作包"] = {
+        idle = {"rbxassetid://109023565617920", "rbxassetid://101782607233045"},
+        walk = "rbxassetid://96565230403734", run = "rbxassetid://94645534606796",
+        jump = "rbxassetid://89471740791625", fall = "rbxassetid://116066537140570",
+        climb = "rbxassetid://71035701144022", swim = "rbxassetid://117171954618884"
+    },
+    ["耍帅动作包"] = {
+        idle = {"rbxassetid://124197517940986", "rbxassetid://127080375158105"},
+        walk = "rbxassetid://85644126666293", run = "rbxassetid://122827866414627",
+        jump = "rbxassetid://84780054160860", fall = "rbxassetid://88549427484310",
+        climb = "rbxassetid://82631171857203", swim = "rbxassetid://115565445454360"
+    },
+    ["无上剑士动作包"] = {
+        idle = {"rbxassetid://75275070779061", "rbxassetid://76822069490432"},
+        walk = "rbxassetid://119363166663846", run = "rbxassetid://108884751408994",
+        jump = "rbxassetid://114408948572123", fall = "rbxassetid://106540921729382",
+        climb = "rbxassetid://119463765803442", swim = "rbxassetid://122151480009235"
+    },
+    ["邪恶流行蹦哒可爱动作包"] = {
+        idle = {"rbxassetid://118832222982049", "rbxassetid://76049494037641"},
+        walk = "rbxassetid://92072849924640", run = "rbxassetid://72301599441680",
+        jump = "rbxassetid://104325245285198", fall = "rbxassetid://121152442762481",
+        climb = "rbxassetid://131326830509784", swim = "rbxassetid://99384245425157"
+    },
+    ["虚空休息动作包"] = {
+        idle = {"rbxassetid://110211186840347", "rbxassetid://114191137265065"},
+        walk = "rbxassetid://83842218823011", run = "rbxassetid://118320322718866",
+        jump = "rbxassetid://109996626521204", fall = "rbxassetid://95603166884636",
+        climb = "rbxassetid://97824616490448", swim = "rbxassetid://134530128383903"
+    },
+    ["悬浮动作包"] = {
+        idle = {"rbxassetid://121544739965950", "rbxassetid://128694271964813"},
+        walk = "rbxassetid://140535536297327", run = "rbxassetid://131446204283995",
+        jump = "rbxassetid://87182355463462", fall = "rbxassetid://119546655136861",
+        climb = "rbxassetid://78662570655863", swim = "rbxassetid://98062782127543"
+    }
+}
+
+-- 保持UI生成的顺序一致性
+local PackOrder = {
+    "啊摇尾巴动作包", "忍者动作包", "日漫画可爱动作包", "吊的女神动作包", 
+    "滑冰动作包", "开朗可爱动作包", "可爱弹跳", "可爱动作包", 
+    "老派动作包", "丧尸动作包", "悬浮坐姿动作包", "耍帅动作包", 
+    "无上剑士动作包", "邪恶流行蹦哒可爱动作包", "虚空休息动作包", "悬浮动作包"
+}
+
+local AnimStateNames = {
+    idle = "待机", walk = "行走", run = "奔跑", 
+    jump = "跳跃", fall = "下落", climb = "攀爬", swim = "游泳"
+}
+
+-- 运行时状态
+local OriginalAnims = {}
+local ActiveAnimData = {} 
+local ToggleObjects = { idle = {}, walk = {}, run = {}, jump = {}, fall = {}, climb = {}, swim = {} }
+local IsUIUpdating = false -- 防止互斥开关引发无限循环死锁
+
+-- ==========================================
+-- ⚙️ 2. 核心渲染与状态管理逻辑
+-- ==========================================
+local function SaveOriginalAnimations(animateScript)
+    if next(OriginalAnims) ~= nil then return end 
+    for state, _ in pairs(AnimStateNames) do
+        local stateFolder = animateScript:FindFirstChild(state)
+        if stateFolder then
+            OriginalAnims[state] = {}
+            for _, anim in ipairs(stateFolder:GetChildren()) do
+                if anim:IsA("Animation") then
+                    table.insert(OriginalAnims[state], {Obj = anim, Id = anim.AnimationId})
+                end
+            end
+        end
+    end
+end
+
+local function ApplyAnimations()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local animateScript = char:FindFirstChild("Animate")
+    if not animateScript then return end
+
+    SaveOriginalAnimations(animateScript)
+
+    for state, defaultAnims in pairs(OriginalAnims) do
+        local stateFolder = animateScript:FindFirstChild(state)
+        if stateFolder then
+            local targetData = ActiveAnimData[state]
+            local index = 1
+            for _, animObj in ipairs(stateFolder:GetChildren()) do
+                if animObj:IsA("Animation") then
+                    if targetData then
+                        animObj.AnimationId = type(targetData) == "table" and targetData[index] or targetData
+                    else
+                        animObj.AnimationId = defaultAnims[index].Id
+                    end
+                    index = index + 1
+                end
+            end
+        end
+    end
+
+    -- 禁用再启用，触发服务端同步 (确保其他玩家可见)
+    animateScript.Disabled = true
+    task.wait(0.05)
+    animateScript.Disabled = false
+end
+
+-- ==========================================
+-- 🖥️ 3. UI 界面构建
+-- ==========================================
+-- 栏位 1: 全局一键替换
+local GlobalTab = Window:AddTab({ Name = "一键全局替换", Icon = "rbxassetid://104508482519186" })
+
+GlobalTab:AddButton({
+    Name = "🔄 初始化 (恢复原始动作)",
+    Callback = function()
+        IsUIUpdating = true
+        for state, toggles in pairs(ToggleObjects) do
+            for _, toggle in pairs(toggles) do
+                if toggle.Value then toggle:SetValue(false) end
+            end
+        end
+        ActiveAnimData = {}
+        IsUIUpdating = false
+        ApplyAnimations()
+    end
+})
+
+for _, packName in ipairs(PackOrder) do
+    GlobalTab:AddButton({
+        Name = "▶ 装备全套: " .. packName,
+        Callback = function()
+            IsUIUpdating = true
+            -- 1. 更新底层数据
+            for state, _ in pairs(AnimStateNames) do
+                ActiveAnimData[state] = AnimPacks[packName][state]
+            end
+            
+            -- 2. 同步更新所有分栏的 UI 开关状态 (互斥展现)
+            for state, toggles in pairs(ToggleObjects) do
+                for targetPackName, toggle in pairs(toggles) do
+                    if targetPackName == packName then
+                        if not toggle.Value then toggle:SetValue(true) end
+                    else
+                        if toggle.Value then toggle:SetValue(false) end
+                    end
+                end
+            end
+            
+            IsUIUpdating = false
+            ApplyAnimations()
+        end
+    })
+end
+
+-- 栏位 2 ~ N: 独立动作包拆分控制
+for _, packName in ipairs(PackOrder) do
+    local packData = AnimPacks[packName]
+    local PackTab = Window:AddTab({ Name = packName, Icon = "rbxassetid://104508482519186" })
+    
+    PackTab:AddLabel("单独控制 " .. packName .. " 散件")
+    
+    for stateKey, stateName in pairs(AnimStateNames) do
+        local animIdData = packData[stateKey]
+        
+        local toggle = PackTab:AddToggle({
+            Name = "开启 [" .. stateName .. "] 动作",
+            Default = false,
+            Callback = function(Value)
+                if IsUIUpdating then return end -- 防止全局按钮触发回调死锁
+                
+                if Value then
+                    -- 【互斥逻辑】自动关闭其他动作包中相同部位的开关
+                    IsUIUpdating = true
+                    for otherPackName, otherToggle in pairs(ToggleObjects[stateKey]) do
+                        if otherPackName ~= packName and otherToggle.Value == true then
+                            otherToggle:SetValue(false)
+                        end
+                    end
+                    IsUIUpdating = false
+                    
+                    ActiveAnimData[stateKey] = animIdData
+                else
+                    if ActiveAnimData[stateKey] == animIdData then
+                        ActiveAnimData[stateKey] = nil
+                    end
+                end
+                ApplyAnimations()
+            end
+        })
+        
+        ToggleObjects[stateKey][packName] = toggle
+    end
+end
+
+-- ==========================================
+-- 🔄 4. 重生永久保持逻辑
+-- ==========================================
+LocalPlayer.CharacterAdded:Connect(function(char)
+    -- 等待新角色的 Animate 脚本加载完成
+    char:WaitForChild("Animate", 10)
+    task.wait(0.5) 
+    
+    -- 清理旧的备份，强制读取新躯体的原始数据，然后应用当前配置
+    OriginalAnims = {} 
+    ApplyAnimations()
+end)
