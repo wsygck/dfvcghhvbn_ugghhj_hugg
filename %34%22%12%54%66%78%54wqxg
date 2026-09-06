@@ -1,5 +1,5 @@
 -- ==========================================
--- 万能枪械修改器 (全中文汉化 + 最小化/关闭)
+-- 万能枪械修改器 (完美拖拽修复版)
 -- ==========================================
 
 local CoreGui = game:GetService("CoreGui")
@@ -8,8 +8,10 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
+-- 清理旧版本注入残留
 if _G.GunModCleanup then pcall(_G.GunModCleanup) end
 
+-- 汉化字典
 local TranslationDict = {
     ["Auto"] = "全自动开火",
     ["Explosive"] = "爆炸弹药",
@@ -42,6 +44,7 @@ local TranslationDict = {
     ["BulletHoleSize"] = "弹孔大小"
 }
 
+-- 随机名防检测机制
 local function GetRandomName()
     local chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
     local str = "hx_"
@@ -60,9 +63,10 @@ ScreenGui.Name = GetRandomName()
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = targetParent
 
+-- 全局擦除函数
 _G.GunModCleanup = function()
     if ScreenGui then ScreenGui:Destroy() end
-    -- 擦除时还原武器数据
+    -- 擦除时无损还原武器数据
     if CurrentSettingsTable and OriginalStats then
         for k, v in pairs(OriginalStats) do CurrentSettingsTable[k] = v end
     end
@@ -77,9 +81,10 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- 最小化悬浮小方块 (60x30 灰白色)
+-- 最小化悬浮小方块
+-- (注意：改为 TextLabel 配合 Active = true，防止被 Button 原生效果干扰)
 -- ==========================================
-local MinFrame = Instance.new("TextButton")
+local MinFrame = Instance.new("TextLabel")
 MinFrame.Size = UDim2.new(0, 60, 0, 30)
 MinFrame.Position = UDim2.new(0.5, -30, 0, 20)
 MinFrame.BackgroundColor3 = Color3.fromRGB(220, 220, 225)
@@ -88,6 +93,7 @@ MinFrame.TextColor3 = Color3.fromRGB(30, 30, 30)
 MinFrame.Font = Enum.Font.SourceSansBold
 MinFrame.TextSize = 14
 MinFrame.Visible = false
+MinFrame.Active = true -- 允许接受鼠标和触摸事件
 MinFrame.Parent = ScreenGui
 Instance.new("UICorner", MinFrame).CornerRadius = UDim.new(0, 8)
 
@@ -149,65 +155,72 @@ CloseBtn.Font = Enum.Font.SourceSansBold
 CloseBtn.TextSize = 16
 CloseBtn.Parent = TitleBar
 
--- 擦除弹窗（销毁UI与恢复数据）
 CloseBtn.MouseButton1Click:Connect(function()
     if _G.GunModCleanup then _G.GunModCleanup() end
 end)
 
--- 最小化动作
 MinBtn.MouseButton1Click:Connect(function()
     MainFrame.Visible = false
     MinFrame.Visible = true
-    -- 将最小化方块瞬间移到当前主窗口的位置
+    -- 智能位置继承：最小化方块瞬间出现在你拖动后主窗口的位置
     MinFrame.Position = UDim2.new(0, MainFrame.AbsolutePosition.X, 0, MainFrame.AbsolutePosition.Y)
 end)
 
 -- ==========================================
--- 拖拽逻辑 (主窗口与最小化方块独立)
+-- 【核心修复】：标准稳定拖拽引擎
 -- ==========================================
-local function MakeDraggable(DragArea, TargetFrame, IsMini)
-    local dragging, dragInput, dragStart, startPos
-    local clickTime = 0
-    
-    DragArea.InputBegan:Connect(function(input)
+local function MakeDraggable(dragHandle, targetFrame, isMini)
+    local dragging = false
+    local dragInput = nil
+    local dragStart = nil
+    local startPos = nil
+
+    dragHandle.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true 
-            dragStart = input.Position 
-            startPos = TargetFrame.Position
-            clickTime = tick() -- 记录点击时间
+            dragging = true
+            dragStart = input.Position
+            startPos = targetFrame.Position
+
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                    -- 修复误触：仅当移动距离绝对值小于 5 像素时，才被认定为"点击"
+                    if isMini then
+                        local dist = (input.Position - dragStart).Magnitude
+                        if dist < 5 then
+                            MinFrame.Visible = false
+                            MainFrame.Visible = true
+                        end
+                    end
+                end
+            end)
         end
     end)
-    
+
+    dragHandle.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+
     UserInputService.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then 
-            dragInput = input 
-        end
-    end)
-    
-    RunService.RenderStepped:Connect(function()
-        if dragging and dragInput then
-            local delta = dragInput.Position - dragStart
-            TargetFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
-    end)
-    
-    DragArea.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
-            dragging = false 
-            -- 如果是最小化方块，且点击时间极短，视为展开请求
-            if IsMini and (tick() - clickTime < 0.2) then
-                MinFrame.Visible = false
-                MainFrame.Visible = true
-            end
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            -- 彻底解决乱飘：基于绝对距离的平滑跟随
+            targetFrame.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + delta.X, 
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y
+            )
         end
     end)
 end
 
+-- 为主窗口的标题栏、以及最小化悬浮窗本身注入独立的拖拽逻辑
 MakeDraggable(TitleBar, MainFrame, false)
 MakeDraggable(MinFrame, MinFrame, true)
 
 -- ==========================================
--- 内部按键与渲染生成
+-- 内部功能按键与渲染生成
 -- ==========================================
 local TopPanel = Instance.new("Frame")
 TopPanel.Size = UDim2.new(1, 0, 0, 50)
