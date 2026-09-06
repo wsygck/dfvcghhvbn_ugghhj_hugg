@@ -1,0 +1,309 @@
+-- ==========================================
+-- 万能枪械修改器 (全中文汉化版)
+-- ==========================================
+
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+if _G.GunModCleanup then pcall(_G.GunModCleanup) end
+
+-- 汉化字典（自动将读取到的英文替换为中文显示）
+local TranslationDict = {
+    ["Auto"] = "全自动开火",
+    ["Explosive"] = "爆炸弹药",
+    ["ShotgunEnabled"] = "散弹模式",
+    ["BurstEnabled"] = "连发模式",
+    ["SniperScopeEnabled"] = "狙击开镜",
+    ["Ammo"] = "弹匣容量",
+    ["Damage"] = "子弹伤害",
+    ["Firerate"] = "射速(越低越快)",
+    ["BulletsPerShot"] = "每次开火子弹数",
+    ["Spread"] = "子弹散布/后坐力",
+    ["ReloadTime"] = "换弹时间(秒)",
+    ["HeadshotDamageMultiplier"] = "爆头伤害倍数",
+    ["KnockbackPower"] = "击退力度",
+    ["LifeStealAmount"] = "吸血数值",
+    ["BurstShots"] = "连发次数",
+    ["BurstFirerate"] = "连发间隔",
+    ["ExplosionRadius"] = "爆炸半径",
+    ["CameraShakeEnabled"] = "开火屏幕震动",
+    ["BulletSpeed"] = "子弹飞行速度",
+    ["DelayBeforeFiring"] = "开火前摇(秒)",
+    ["DelayAfterFiring"] = "开火后摇(秒)",
+    ["FOV"] = "瞄准视野缩放",
+    ["MouseSensitivity"] = "开镜鼠标灵敏度",
+    ["ChargeUpEnabled"] = "蓄力模式",
+    ["ChargeUpTime"] = "蓄力所需时间",
+    ["MinigunEnabled"] = "加特林模式",
+    ["DualEnabled"] = "双持模式",
+    ["BulletFadeTime"] = "弹道消失时间",
+    ["BulletHoleSize"] = "弹孔大小"
+}
+
+local function GetRandomName()
+    local chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+    local str = "hx_"
+    for i = 1, 57 do str = str .. string.sub(chars, math.random(1, #chars), math.random(1, #chars)) end
+    return str
+end
+
+local OriginalStats, CustomStats, CurrentSettingsTable = {}, {}, nil
+local IsModEnabled = false
+
+local targetParent = CoreGui
+pcall(function() if gethui then targetParent = gethui() end end)
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = GetRandomName()
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = targetParent
+
+_G.GunModCleanup = function()
+    if ScreenGui then ScreenGui:Destroy() end
+    if CurrentSettingsTable and OriginalStats then
+        for k, v in pairs(OriginalStats) do CurrentSettingsTable[k] = v end
+    end
+    _G.GunModCleanup = nil
+end
+
+task.spawn(function()
+    while ScreenGui and ScreenGui.Parent do
+        ScreenGui.Name = GetRandomName()
+        task.wait(1)
+    end
+end)
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 360, 0, 480)
+MainFrame.Position = UDim2.new(0.5, -180, 0.5, -240)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = ScreenGui
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
+
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 40)
+TitleBar.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+TitleBar.Parent = MainFrame
+Instance.new("UICorner", TitleBar).CornerRadius = UDim.new(0, 10)
+
+local TitleBlocker = Instance.new("Frame")
+TitleBlocker.Size = UDim2.new(1, 0, 0, 10)
+TitleBlocker.Position = UDim2.new(0, 0, 1, -10)
+TitleBlocker.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+TitleBlocker.BorderSizePixel = 0
+TitleBlocker.Parent = TitleBar
+
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Size = UDim2.new(1, -20, 1, 0)
+TitleLabel.Position = UDim2.new(0, 10, 0, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text = "⚙️ 枪械数据修改器 (中文版)"
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleLabel.Font = Enum.Font.SourceSansBold
+TitleLabel.TextSize = 18
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+TitleLabel.Parent = TitleBar
+
+local dragging, dragInput, dragStart, startPos
+TitleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true dragStart = input.Position startPos = MainFrame.Position
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
+end)
+RunService.RenderStepped:Connect(function()
+    if dragging and dragInput then
+        local delta = dragInput.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end
+end)
+
+local TopPanel = Instance.new("Frame")
+TopPanel.Size = UDim2.new(1, 0, 0, 50)
+TopPanel.Position = UDim2.new(0, 0, 0, 40)
+TopPanel.BackgroundTransparency = 1
+TopPanel.Parent = MainFrame
+
+local LoadBtn = Instance.new("TextButton")
+LoadBtn.Size = UDim2.new(0, 140, 0, 30)
+LoadBtn.Position = UDim2.new(0, 15, 0.5, -15)
+LoadBtn.BackgroundColor3 = Color3.fromRGB(60, 120, 200)
+LoadBtn.Text = "读取手中武器"
+LoadBtn.TextColor3 = Color3.new(1,1,1)
+LoadBtn.Font = Enum.Font.SourceSansBold
+LoadBtn.TextSize = 14
+LoadBtn.Parent = TopPanel
+Instance.new("UICorner", LoadBtn).CornerRadius = UDim.new(0, 6)
+
+local MasterToggleLabel = Instance.new("TextLabel")
+MasterToggleLabel.Size = UDim2.new(0, 80, 0, 30)
+MasterToggleLabel.Position = UDim2.new(1, -145, 0.5, -15)
+MasterToggleLabel.BackgroundTransparency = 1
+MasterToggleLabel.Text = "修改总开关:"
+MasterToggleLabel.TextColor3 = Color3.new(1,1,1)
+MasterToggleLabel.Font = Enum.Font.SourceSansBold
+MasterToggleLabel.TextSize = 14
+MasterToggleLabel.Parent = TopPanel
+
+local MasterToggleBtn = Instance.new("TextButton")
+MasterToggleBtn.Size = UDim2.new(0, 50, 0, 26)
+MasterToggleBtn.Position = UDim2.new(1, -65, 0.5, -13)
+MasterToggleBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+MasterToggleBtn.Text = "OFF"
+MasterToggleBtn.TextColor3 = Color3.new(1,1,1)
+MasterToggleBtn.Font = Enum.Font.SourceSansBold
+MasterToggleBtn.Parent = TopPanel
+Instance.new("UICorner", MasterToggleBtn).CornerRadius = UDim.new(0, 13)
+
+local ScrollFrame = Instance.new("ScrollingFrame")
+ScrollFrame.Size = UDim2.new(1, -20, 1, -100)
+ScrollFrame.Position = UDim2.new(0, 10, 0, 90)
+ScrollFrame.BackgroundTransparency = 1
+ScrollFrame.ScrollBarThickness = 4
+ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+ScrollFrame.Parent = MainFrame
+
+local UIListLayout = Instance.new("UIListLayout", ScrollFrame)
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 5)
+
+local function ApplySettings()
+    if not CurrentSettingsTable then return end
+    if IsModEnabled then
+        for k, v in pairs(CustomStats) do
+            if CurrentSettingsTable[k] ~= nil then CurrentSettingsTable[k] = v end
+        end
+    else
+        for k, v in pairs(OriginalStats) do
+            if CurrentSettingsTable[k] ~= nil then CurrentSettingsTable[k] = v end
+        end
+    end
+end
+
+MasterToggleBtn.MouseButton1Click:Connect(function()
+    IsModEnabled = not IsModEnabled
+    MasterToggleBtn.BackgroundColor3 = IsModEnabled and Color3.fromRGB(60, 200, 100) or Color3.fromRGB(80, 80, 80)
+    MasterToggleBtn.Text = IsModEnabled and "ON" or "OFF"
+    ApplySettings()
+end)
+
+local function CreateSettingRow(key, value)
+    local Row = Instance.new("Frame")
+    Row.Size = UDim2.new(1, -10, 0, 35)
+    Row.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+    Row.Parent = ScrollFrame
+    Instance.new("UICorner", Row).CornerRadius = UDim.new(0, 6)
+
+    -- 如果字典里有翻译就用中文，没有就原样显示英文
+    local displayName = TranslationDict[key] or key
+
+    local KeyLabel = Instance.new("TextLabel")
+    KeyLabel.Size = UDim2.new(0.65, -10, 1, 0)
+    KeyLabel.Position = UDim2.new(0, 10, 0, 0)
+    KeyLabel.BackgroundTransparency = 1
+    KeyLabel.Text = displayName
+    KeyLabel.TextColor3 = Color3.new(0.9, 0.9, 0.9)
+    KeyLabel.TextXAlignment = Enum.TextXAlignment.Left
+    KeyLabel.Font = Enum.Font.SourceSans
+    KeyLabel.TextSize = 14
+    KeyLabel.TextWrapped = true
+    KeyLabel.Parent = Row
+
+    if type(value) == "boolean" then
+        local Toggle = Instance.new("TextButton")
+        Toggle.Size = UDim2.new(0, 45, 0, 20)
+        Toggle.Position = UDim2.new(1, -55, 0.5, -10)
+        Toggle.BackgroundColor3 = value and Color3.fromRGB(60, 200, 100) or Color3.fromRGB(80, 80, 80)
+        Toggle.Text = value and "开启" or "关闭"
+        Toggle.TextColor3 = Color3.new(1,1,1)
+        Toggle.Font = Enum.Font.SourceSansBold
+        Toggle.TextSize = 12
+        Toggle.Parent = Row
+        Instance.new("UICorner", Toggle).CornerRadius = UDim.new(0, 10)
+
+        Toggle.MouseButton1Click:Connect(function()
+            CustomStats[key] = not CustomStats[key]
+            Toggle.BackgroundColor3 = CustomStats[key] and Color3.fromRGB(60, 200, 100) or Color3.fromRGB(80, 80, 80)
+            Toggle.Text = CustomStats[key] and "开启" or "关闭"
+            if IsModEnabled then ApplySettings() end
+        end)
+    else
+        local InputBox = Instance.new("TextBox")
+        InputBox.Size = UDim2.new(0, 80, 0, 24)
+        InputBox.Position = UDim2.new(1, -90, 0.5, -12)
+        InputBox.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+        InputBox.Text = tostring(value)
+        InputBox.TextColor3 = Color3.fromRGB(100, 200, 255)
+        InputBox.Font = Enum.Font.Code
+        InputBox.TextSize = 14
+        InputBox.Parent = Row
+        Instance.new("UICorner", InputBox).CornerRadius = UDim.new(0, 4)
+
+        InputBox.FocusLost:Connect(function()
+            local newVal = InputBox.Text
+            if type(OriginalStats[key]) == "number" then
+                newVal = tonumber(newVal) or OriginalStats[key]
+                InputBox.Text = tostring(newVal)
+            end
+            CustomStats[key] = newVal
+            if IsModEnabled then ApplySettings() end
+        end)
+    end
+end
+
+LoadBtn.MouseButton1Click:Connect(function()
+    local char = LocalPlayer.Character
+    if not char then return end
+
+    local tool = char:FindFirstChildOfClass("Tool")
+    if not tool then
+        LoadBtn.Text = "请先拿在手里!"
+        task.wait(1) LoadBtn.Text = "读取手中武器"
+        return
+    end
+
+    local settingsMod = tool:FindFirstChild("Settings")
+    if not settingsMod or not settingsMod:IsA("ModuleScript") then
+        LoadBtn.Text = "不是支持的枪械!"
+        task.wait(1) LoadBtn.Text = "读取手中武器"
+        return
+    end
+
+    local success, result = pcall(function() return require(settingsMod) end)
+    if not success or type(result) ~= "table" then
+        LoadBtn.Text = "读取失败!"
+        task.wait(1) LoadBtn.Text = "读取手中武器"
+        return
+    end
+
+    CurrentSettingsTable = result
+    OriginalStats = {}
+    CustomStats = {}
+
+    for _, v in ipairs(ScrollFrame:GetChildren()) do
+        if v:IsA("Frame") then v:Destroy() end
+    end
+
+    local itemCount = 0
+    for key, value in pairs(CurrentSettingsTable) do
+        if type(value) == "number" or type(value) == "boolean" or type(value) == "string" then
+            OriginalStats[key] = value
+            CustomStats[key] = value
+            CreateSettingRow(key, value)
+            itemCount = itemCount + 1
+        end
+    end
+    
+    ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, itemCount * 40)
+    LoadBtn.Text = "已成功加载!"
+    task.wait(1.5) LoadBtn.Text = "读取手中武器"
+end)
